@@ -1,14 +1,12 @@
 import { Navbar } from "@/components/navbar"
-import { HeroSection } from "@/components/hero-section"
-import { FlightSearch } from "@/components/flight-search"
+import { FlightResults } from "@/components/flight-results"
 import { Footer } from "@/components/footer"
 
-export default function Home() {
+export default function FlightsPage() {
   return (
     <main className="min-h-screen bg-background">
       <Navbar />
-      <HeroSection />
-      <FlightSearch />
+      <FlightResults />
       <Footer />
     </main>
   )

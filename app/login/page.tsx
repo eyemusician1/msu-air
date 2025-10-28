@@ -1,14 +1,12 @@
 import { Navbar } from "@/components/navbar"
-import { HeroSection } from "@/components/hero-section"
-import { FlightSearch } from "@/components/flight-search"
+import { LoginForm } from "@/components/login-form"
 import { Footer } from "@/components/footer"
 
-export default function Home() {
+export default function Login() {
   return (
     <main className="min-h-screen bg-background">
       <Navbar />
-      <HeroSection />
-      <FlightSearch />
+      <LoginForm />
       <Footer />
     </main>
   )
