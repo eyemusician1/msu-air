@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 @theme inline {
   --font-sans: "Geist", "Geist Fallback";
@@ -114,38 +112,42 @@
   --sidebar-ring: oklch(0.65 0.12 200);
 }
 
-* {
-  border-color: var(--color-border);
-  outline-color: color-mix(in oklch, var(--color-ring), transparent 50%);
+@layer base {
+  * {
+    border-color: var(--color-border);
+    outline-color: color-mix(in oklch, var(--color-ring), transparent 50%);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
 }
 
-body {
-  background-color: var(--color-background);
-  color: var(--color-foreground);
-}
+@layer utilities {
+  .glass {
+    background-color: rgb(255 255 255 / 0.1);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgb(255 255 255 / 0.2);
+    border-radius: 0.75rem;
+  }
 
-.glass {
-  background-color: rgb(255 255 255 / 0.1);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgb(255 255 255 / 0.2);
-  border-radius: 0.75rem;
-}
+  .glass-card {
+    background-color: rgb(255 255 255 / 0.05);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgb(255 255 255 / 0.1);
+    border-radius: 0.5rem;
+  }
 
-.glass-card {
-  background-color: rgb(255 255 255 / 0.05);
-  backdrop-filter: blur(4px);
-  border: 1px solid rgb(255 255 255 / 0.1);
-  border-radius: 0.5rem;
-}
+  .gradient-sky {
+    background-image: linear-gradient(to bottom right, #38bdf8, #3b82f6, #2563eb);
+  }
 
-.gradient-sky {
-  background-image: linear-gradient(to bottom right, #38bdf8, #3b82f6, #2563eb);
-}
+  .gradient-navy {
+    background-image: linear-gradient(to bottom right, #1e3a8a, #1e40af, #0f172a);
+  }
 
-.gradient-navy {
-  background-image: linear-gradient(to bottom right, #1e3a8a, #1e40af, #0f172a);
-}
-
-.glow-accent {
-  box-shadow: 0 10px 15px -3px rgb(59 130 246 / 0.2), 0 4px 6px -4px rgb(59 130 246 / 0.2);
+  .glow-accent {
+    box-shadow: 0 10px 15px -3px rgb(59 130 246 / 0.2), 0 4px 6px -4px rgb(59 130 246 / 0.2);
+  }
 }

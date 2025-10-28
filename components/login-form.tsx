@@ -1,10 +1,11 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Mail, Lock, Plane, Eye, EyeOff, AlertCircle } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/contexts/auth-context"
+import { useRouter } from "next/navigation"
 
 export function LoginForm() {
   const [isLogin, setIsLogin] = useState(true)
@@ -18,6 +19,10 @@ export function LoginForm() {
     rememberMe: false,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [authError, setAuthError] = useState("")
+  
+  const { signUp, login, loginWithGoogle } = useAuth()
+  const router = useRouter()
 
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {}
@@ -49,25 +54,73 @@ export function LoginForm() {
     return Object.keys(newErrors).length === 0
   }
 
+  const getFirebaseErrorMessage = (error: any) => {
+    switch (error.code) {
+      case 'auth/email-already-in-use':
+        return 'This email is already registered'
+      case 'auth/invalid-email':
+        return 'Invalid email address'
+      case 'auth/operation-not-allowed':
+        return 'Operation not allowed'
+      case 'auth/weak-password':
+        return 'Password is too weak'
+      case 'auth/user-disabled':
+        return 'This account has been disabled'
+      case 'auth/user-not-found':
+        return 'No account found with this email'
+      case 'auth/wrong-password':
+        return 'Incorrect password'
+      case 'auth/invalid-credential':
+        return 'Invalid email or password'
+      case 'auth/too-many-requests':
+        return 'Too many attempts. Please try again later'
+      case 'auth/network-request-failed':
+        return 'Network error. Please check your connection'
+      case 'auth/popup-closed-by-user':
+        return 'Sign-in popup was closed'
+      default:
+        return error.message || 'An error occurred. Please try again'
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setAuthError("")
 
     if (!validateForm()) return
 
     setIsSubmitting(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setIsSubmitting(false)
 
-    // Reset form
-    setFormData({
-      name: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-      rememberMe: false,
-    })
-    setErrors({})
+    try {
+      if (isLogin) {
+        await login(formData.email, formData.password)
+      } else {
+        await signUp(formData.email, formData.password, formData.name)
+      }
+      
+      // Redirect to home or dashboard after successful auth
+      router.push('/')
+    } catch (error: any) {
+      console.error('Auth error:', error)
+      setAuthError(getFirebaseErrorMessage(error))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleGoogleSignIn = async () => {
+    setAuthError("")
+    setIsSubmitting(true)
+
+    try {
+      await loginWithGoogle()
+      router.push('/')
+    } catch (error: any) {
+      console.error('Google sign-in error:', error)
+      setAuthError(getFirebaseErrorMessage(error))
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -79,6 +132,10 @@ export function LoginForm() {
     // Clear error for this field when user starts typing
     if (errors[name]) {
       setErrors({ ...errors, [name]: "" })
+    }
+    // Clear auth error when user starts typing
+    if (authError) {
+      setAuthError("")
     }
   }
 
@@ -99,6 +156,13 @@ export function LoginForm() {
           <p className="text-slate-300 text-center mb-8">
             {isLogin ? "Sign in to your account" : "Join us for seamless travel"}
           </p>
+
+          {authError && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-2">
+              <AlertCircle size={18} className="text-red-400 mt-0.5 flex-shrink-0" />
+              <span className="text-red-400 text-sm">{authError}</span>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
@@ -211,7 +275,7 @@ export function LoginForm() {
                   />
                   <span className="text-sm text-slate-300">Remember me</span>
                 </label>
-                <Link href="#" className="text-sm text-emerald-400 hover:text-emerald-300 font-semibold">
+                <Link href="/forgot-password" className="text-sm text-emerald-400 hover:text-emerald-300 font-semibold">
                   Forgot password?
                 </Link>
               </div>
@@ -237,7 +301,9 @@ export function LoginForm() {
 
           <button
             type="button"
-            className="w-full py-3 border border-slate-600 rounded-lg hover:bg-slate-700 transition font-semibold text-slate-200"
+            onClick={handleGoogleSignIn}
+            disabled={isSubmitting}
+            className="w-full py-3 border border-slate-600 rounded-lg hover:bg-slate-700 transition font-semibold text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Google
           </button>
@@ -248,6 +314,7 @@ export function LoginForm() {
               onClick={() => {
                 setIsLogin(!isLogin)
                 setErrors({})
+                setAuthError("")
                 setFormData({
                   name: "",
                   email: "",
