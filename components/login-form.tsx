@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Mail, Lock, Plane, Eye, EyeOff, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
@@ -98,12 +98,13 @@ export function LoginForm() {
         await signUp(formData.email, formData.password, formData.name)
       }
       
-      // Redirect to home or dashboard after successful auth
-      router.push('/')
+      // Small delay to ensure Firebase auth state is updated
+      setTimeout(() => {
+        window.location.href = '/'
+      }, 500)
     } catch (error: any) {
       console.error('Auth error:', error)
       setAuthError(getFirebaseErrorMessage(error))
-    } finally {
       setIsSubmitting(false)
     }
   }
@@ -114,11 +115,13 @@ export function LoginForm() {
 
     try {
       await loginWithGoogle()
-      router.push('/')
+      // Small delay to ensure Firebase auth state is updated
+      setTimeout(() => {
+        window.location.href = '/'
+      }, 500)
     } catch (error: any) {
       console.error('Google sign-in error:', error)
       setAuthError(getFirebaseErrorMessage(error))
-    } finally {
       setIsSubmitting(false)
     }
   }
@@ -303,7 +306,8 @@ export function LoginForm() {
          <button
   type="button"
   onClick={handleGoogleSignIn}
-  className="w-full py-3 border border-slate-600 rounded-lg hover:bg-slate-700 hover:border-emerald-500/50 transition font-semibold text-slate-200 flex items-center justify-center gap-3 group"
+  disabled={isSubmitting}
+  className="w-full py-3 border border-slate-600 rounded-lg hover:bg-slate-700 hover:border-emerald-500/50 transition font-semibold text-slate-200 flex items-center justify-center gap-3 group disabled:opacity-50 disabled:cursor-not-allowed"
 >
   <div className="flex items-center justify-center w-5 h-5">
     <svg

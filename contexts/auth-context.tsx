@@ -49,7 +49,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, name: string) => {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    // Update user profile with name
     if (userCredential.user) {
       await updateProfile(userCredential.user, { displayName: name });
     }
@@ -61,6 +60,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     await signOut(auth);
+    // Force page reload to clear all state
+    window.location.href = '/login';
   };
 
   const loginWithGoogle = async () => {
@@ -84,7 +85,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 }
