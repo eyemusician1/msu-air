@@ -1,68 +1,92 @@
+// components/user-dashboard.tsx - FIXED VERSION
 "use client"
 
-import { useState } from "react"
-import { LogOut, User, Bookmark, Plane, Calendar, MapPin, QrCode, Heart, Edit2, Save } from "lucide-react"
-
-const mockBookings = [
-  {
-    id: 1,
-    status: "upcoming",
-    airline: "SkyWings",
-    flightNumber: "SW101",
-    from: "JFK",
-    to: "LAX",
-    date: "Dec 15, 2024",
-    time: "08:00",
-    bookingRef: "ABC123",
-    seats: "12A, 12B",
-  },
-  {
-    id: 2,
-    status: "completed",
-    airline: "AeroFly",
-    flightNumber: "AF205",
-    from: "LAX",
-    to: "ORD",
-    date: "Dec 10, 2024",
-    time: "14:30",
-    bookingRef: "XYZ789",
-    seats: "5C",
-  },
-  {
-    id: 3,
-    status: "cancelled",
-    airline: "CloudJet",
-    flightNumber: "CJ312",
-    from: "ORD",
-    to: "MIA",
-    date: "Dec 5, 2024",
-    time: "10:15",
-    bookingRef: "DEF456",
-    seats: "8D",
-  },
-]
-
-const mockSavedFlights = [
-  { id: 1, from: "JFK", to: "LAX", airline: "SkyWings", price: 299 },
-  { id: 2, from: "LAX", to: "ORD", airline: "AeroFly", price: 249 },
-]
+import { useState, useEffect } from "react"
+import { LogOut, User, Bookmark, Plane, Calendar, QrCode, Heart, Edit2, Save } from "lucide-react"
+import { useAuth } from "@/contexts/auth-context"
+import type { Booking } from "@/lib/types"
 
 export function UserDashboard() {
+  const { user, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<"bookings" | "profile" | "saved">("bookings")
   const [bookingTab, setBookingTab] = useState("upcoming")
-  const [selectedBooking, setSelectedBooking] = useState<(typeof mockBookings)[0] | null>(null)
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState({
-    name: "John Doe",
-    email: "john@example.com",
+    name: user?.displayName || "User",
+    email: user?.email || "",
     phone: "+1 (555) 123-4567",
     passport: "AB123456",
   })
 
-  const filteredBookings = mockBookings.filter((b) => b.status === bookingTab)
+  useEffect(() => {
+    if (user) {
+      setProfile({
+        name: user.displayName || "User",
+        email: user.email || "",
+        phone: "+1 (555) 123-4567",
+        passport: "AB123456",
+      })
+    }
+  }, [user])
+
+  useEffect(() => {
+    const fetchBookings = async () => {
+      if (!user?.uid) {
+        setLoading(false)
+        return
+      }
+      
+      try {
+        const response = await fetch(`/api/bookings?userId=${user.uid}`)
+        if (response.ok) {
+          const data = await response.json()
+          setBookings(data)
+        }
+      } catch (error) {
+        console.error("Error fetching bookings:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchBookings()
+  }, [user])
+
+  const filteredBookings = bookings.filter((b) => {
+    if (bookingTab === "upcoming") return b.status === "confirmed"
+    if (bookingTab === "completed") return b.status === "completed"
+    if (bookingTab === "cancelled") return b.status === "cancelled"
+    return false
+  })
 
   const handleProfileChange = (field: string, value: string) => {
     setProfile({ ...profile, [field]: value })
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      window.location.href = '/login'
+    } catch (error) {
+      console.error("Logout error:", error)
+    }
+  }
+
+  if (!user) {
+    return null
+  }
+
+  if (loading) {
+    return (
+      <section className="py-12 bg-gray-50 min-h-screen">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">Loading your bookings...</div>
+        </div>
+      </section>
+    )
   }
 
   return (
@@ -114,7 +138,10 @@ export function UserDashboard() {
                 >
                   <User size={18} /> Profile
                 </button>
-                <button className="w-full flex items-center gap-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition">
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-3 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                >
                   <LogOut size={18} /> Logout
                 </button>
               </nav>
@@ -161,11 +188,10 @@ export function UserDashboard() {
                           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
-                                <span className="font-semibold text-gray-900">{booking.airline}</span>
-                                <span className="text-sm text-gray-500">{booking.flightNumber}</span>
+                                <span className="font-semibold text-gray-900">Flight {booking.flightId}</span>
                                 <span
                                   className={`text-xs px-2 py-1 rounded-full ${
-                                    booking.status === "upcoming"
+                                    booking.status === "confirmed"
                                       ? "bg-green-100 text-green-800"
                                       : booking.status === "completed"
                                         ? "bg-blue-100 text-blue-800"
@@ -175,13 +201,11 @@ export function UserDashboard() {
                                   {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-2 text-gray-600">
-                                <span className="font-semibold">{booking.from}</span>
-                                <Plane size={16} className="rotate-90" />
-                                <span className="font-semibold">{booking.to}</span>
-                              </div>
                               <p className="text-sm text-gray-500 mt-1">
-                                {booking.date} at {booking.time}
+                                Seats: {booking.selectedSeats.join(", ")}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                Passengers: {booking.passengers.map(p => p.name).join(", ")}
                               </p>
                             </div>
                             <div className="text-right">
@@ -201,40 +225,10 @@ export function UserDashboard() {
             {activeTab === "saved" && (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-6">
-                  {mockSavedFlights.length === 0 ? (
-                    <div className="text-center py-12">
-                      <Heart size={48} className="mx-auto text-gray-300 mb-4" />
-                      <p className="text-gray-600">No saved flights yet</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {mockSavedFlights.map((flight) => (
-                        <div
-                          key={flight.id}
-                          className="p-4 border border-gray-200 rounded-lg hover:shadow-md transition"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="font-semibold text-gray-900">{flight.airline}</span>
-                              </div>
-                              <div className="flex items-center gap-2 text-gray-600">
-                                <span className="font-semibold">{flight.from}</span>
-                                <Plane size={16} className="rotate-90" />
-                                <span className="font-semibold">{flight.to}</span>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-2xl font-bold text-blue-600">${flight.price}</p>
-                              <button className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-semibold">
-                                Book Now
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <div className="text-center py-12">
+                    <Heart size={48} className="mx-auto text-gray-300 mb-4" />
+                    <p className="text-gray-600">No saved flights yet</p>
+                  </div>
                 </div>
               </div>
             )}
@@ -329,28 +323,16 @@ export function UserDashboard() {
                 <Plane size={20} className="text-blue-600" />
                 <div>
                   <p className="text-sm text-gray-600">Flight</p>
-                  <p className="font-semibold text-gray-900">
-                    {selectedBooking.airline} {selectedBooking.flightNumber}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <MapPin size={20} className="text-blue-600" />
-                <div>
-                  <p className="text-sm text-gray-600">Route</p>
-                  <p className="font-semibold text-gray-900">
-                    {selectedBooking.from} → {selectedBooking.to}
-                  </p>
+                  <p className="font-semibold text-gray-900">{selectedBooking.flightId}</p>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
                 <Calendar size={20} className="text-blue-600" />
                 <div>
-                  <p className="text-sm text-gray-600">Date & Time</p>
+                  <p className="text-sm text-gray-600">Booking Date</p>
                   <p className="font-semibold text-gray-900">
-                    {selectedBooking.date} at {selectedBooking.time}
+                    {new Date(selectedBooking.createdAt).toLocaleDateString()}
                   </p>
                 </div>
               </div>
@@ -367,14 +349,18 @@ export function UserDashboard() {
                 <Plane size={20} className="text-blue-600" />
                 <div>
                   <p className="text-sm text-gray-600">Seats</p>
-                  <p className="font-semibold text-gray-900">{selectedBooking.seats}</p>
+                  <p className="font-semibold text-gray-900">{selectedBooking.selectedSeats.join(", ")}</p>
                 </div>
               </div>
-            </div>
 
-            <div className="bg-gray-100 p-4 rounded-lg mb-6 flex items-center justify-center">
-              <div className="w-32 h-32 bg-white border-2 border-gray-300 rounded flex items-center justify-center">
-                <QrCode size={64} className="text-gray-400" />
+              <div className="flex items-center gap-3">
+                <User size={20} className="text-blue-600" />
+                <div>
+                  <p className="text-sm text-gray-600">Passengers</p>
+                  <p className="font-semibold text-gray-900">
+                    {selectedBooking.passengers.map(p => p.name).join(", ")}
+                  </p>
+                </div>
               </div>
             </div>
 

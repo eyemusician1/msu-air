@@ -1,12 +1,45 @@
+// components/booking-page.tsx - FIXED VERSION
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Plane, Calendar, Armchair, User } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
+import type { Flight, Booking, Passenger } from "@/lib/types"
 
 export function BookingPage() {
+  const { user } = useAuth()
+  const searchParams = useSearchParams()
+  const flightId = searchParams.get("flightId")
+
+  const [flight, setFlight] = useState<Flight | null>(null)
   const [selectedSeats, setSelectedSeats] = useState<string[]>([])
-  const [passengers, setPassengers] = useState([{ name: "", email: "", phone: "" }])
+  const [passengers, setPassengers] = useState<Passenger[]>([{ name: "", email: "", phone: "" }])
   const [step, setStep] = useState<"seats" | "passengers" | "confirm">("seats")
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchFlight = async () => {
+      if (!flightId) {
+        setLoading(false)
+        return
+      }
+      
+      try {
+        const response = await fetch(`/api/flights?id=${flightId}`)
+        if (response.ok) {
+          const data = await response.json()
+          setFlight(data[0])
+        }
+      } catch (error) {
+        console.error("Error fetching flight:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchFlight()
+  }, [flightId])
 
   const toggleSeat = (seatId: string) => {
     setSelectedSeats((prev) => (prev.includes(seatId) ? prev.filter((s) => s !== seatId) : [...prev, seatId]))
@@ -14,7 +47,7 @@ export function BookingPage() {
 
   const reservedSeats = ["2A", "2B", "3C", "5A", "7B", "8A", "8B", "8C"]
 
-  const updatePassenger = (index: number, field: string, value: string) => {
+  const updatePassenger = (index: number, field: keyof Passenger, value: string) => {
     const newPassengers = [...passengers]
     newPassengers[index] = { ...newPassengers[index], [field]: value }
     setPassengers(newPassengers)
@@ -28,9 +61,76 @@ export function BookingPage() {
     setPassengers(passengers.filter((_, i) => i !== index))
   }
 
-  const basePrice = 299
+  const basePrice = flight?.price || 299
   const taxesPerSeat = 45
   const totalPrice = (basePrice + taxesPerSeat) * (selectedSeats.length || 1)
+
+  const handleCompleteBooking = async () => {
+    if (!user?.uid || !flight) {
+      alert("Please log in to complete booking")
+      return
+    }
+
+    try {
+      // Map passengers to include seat assignments
+      const passengersWithSeats: Passenger[] = passengers.map((p, index) => ({
+        ...p,
+        seatAssignment: selectedSeats[index] || selectedSeats[0]
+      }))
+
+      const bookingData: Omit<Booking, 'id'> = {
+        userId: user.uid,
+        flightId: flight.id,
+        passengers: passengersWithSeats,
+        selectedSeats: selectedSeats,
+        status: "confirmed",
+        totalPrice,
+        bookingRef: `${flight.flightNumber}-${Date.now()}`,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }
+
+      const response = await fetch("/api/bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bookingData),
+      })
+
+      if (response.ok) {
+        alert("Booking confirmed! Check your dashboard for details.")
+        window.location.href = "/dashboard"
+      } else {
+        alert("Failed to complete booking. Please try again.")
+      }
+    } catch (error) {
+      console.error("Error completing booking:", error)
+      alert("Failed to complete booking. Please try again.")
+    }
+  }
+
+  if (!user) {
+    return null
+  }
+
+  if (loading) {
+    return (
+      <section className="py-12 bg-gray-50 min-h-screen">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">Loading flight details...</div>
+        </div>
+      </section>
+    )
+  }
+
+  if (!flight) {
+    return (
+      <section className="py-12 bg-gray-50 min-h-screen">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">Flight not found</div>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section className="py-12 bg-gray-50 min-h-screen">
@@ -229,16 +329,16 @@ export function BookingPage() {
                     <h3 className="font-semibold text-gray-900 mb-3">Flight Details</h3>
                     <div className="space-y-2 text-sm text-gray-700">
                       <p>
-                        <span className="font-semibold">Flight:</span> SkyWings SW101
+                        <span className="font-semibold">Flight:</span> {flight.airline} {flight.flightNumber}
                       </p>
                       <p>
-                        <span className="font-semibold">Route:</span> New York (JFK) → Los Angeles (LAX)
+                        <span className="font-semibold">Route:</span> {flight.from} → {flight.to}
                       </p>
                       <p>
-                        <span className="font-semibold">Date:</span> Dec 15, 2024
+                        <span className="font-semibold">Date:</span> {flight.date}
                       </p>
                       <p>
-                        <span className="font-semibold">Time:</span> 08:00 - 12:30
+                        <span className="font-semibold">Time:</span> {flight.departure} - {flight.arrival}
                       </p>
                     </div>
                   </div>
@@ -270,7 +370,10 @@ export function BookingPage() {
                   >
                     Back
                   </button>
-                  <button className="flex-1 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition">
+                  <button
+                    onClick={handleCompleteBooking}
+                    className="flex-1 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition"
+                  >
                     Complete Booking
                   </button>
                 </div>
@@ -287,16 +390,22 @@ export function BookingPage() {
                 <div className="flex items-start gap-3">
                   <Plane size={18} className="text-blue-600 mt-1 flex-shrink-0" />
                   <div>
-                    <p className="font-semibold text-gray-900">SkyWings SW101</p>
-                    <p className="text-sm text-gray-600">New York → Los Angeles</p>
+                    <p className="font-semibold text-gray-900">
+                      {flight.airline} {flight.flightNumber}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {flight.from} → {flight.to}
+                    </p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3">
                   <Calendar size={18} className="text-blue-600 mt-1 flex-shrink-0" />
                   <div>
-                    <p className="font-semibold text-gray-900">Dec 15, 2024</p>
-                    <p className="text-sm text-gray-600">08:00 - 12:30</p>
+                    <p className="font-semibold text-gray-900">{flight.date}</p>
+                    <p className="text-sm text-gray-600">
+                      {flight.departure} - {flight.arrival}
+                    </p>
                   </div>
                 </div>
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   BarChart,
   Bar,
@@ -17,6 +17,7 @@ import {
   Cell,
 } from "recharts"
 import { Plus, Edit2, Trash2, Users, Plane, DollarSign, TrendingUp, X } from "lucide-react"
+import type { Flight } from "@/lib/types"
 
 const analyticsData = [
   { month: "Jan", bookings: 400, revenue: 24000 },
@@ -27,19 +28,14 @@ const analyticsData = [
   { month: "Jun", bookings: 850, revenue: 51000 },
 ]
 
-const initialFlightData = [
-  { id: 1, number: "SW101", from: "JFK", to: "LAX", capacity: 180, booked: 156 },
-  { id: 2, number: "SW202", from: "LAX", to: "ORD", capacity: 180, booked: 142 },
-  { id: 3, number: "AF305", from: "ORD", to: "MIA", capacity: 150, booked: 128 },
-]
-
 const COLORS = ["#10b981", "#14b8a6", "#f59e0b", "#06b6d4"]
 
 export function AdminPanel() {
   const [activeTab, setActiveTab] = useState("overview")
   const [showAddFlight, setShowAddFlight] = useState(false)
-  const [flightData, setFlightData] = useState(initialFlightData)
-  const [editingFlight, setEditingFlight] = useState<(typeof initialFlightData)[0] | null>(null)
+  const [flightData, setFlightData] = useState<Flight[]>([])
+  const [editingFlight, setEditingFlight] = useState<Flight | null>(null)
+  const [loading, setLoading] = useState(true)
   const [formData, setFormData] = useState({
     number: "",
     from: "",
@@ -47,45 +43,79 @@ export function AdminPanel() {
     capacity: "",
   })
 
-  const handleAddFlight = () => {
-    if (formData.number && formData.from && formData.to && formData.capacity) {
-      if (editingFlight) {
-        setFlightData(
-          flightData.map((f) =>
-            f.id === editingFlight.id
-              ? {
-                  ...f,
-                  number: formData.number,
-                  from: formData.from,
-                  to: formData.to,
-                  capacity: Number(formData.capacity),
-                }
-              : f,
-          ),
-        )
-        setEditingFlight(null)
-      } else {
-        setFlightData([
-          ...flightData,
-          {
-            id: Math.max(...flightData.map((f) => f.id), 0) + 1,
-            number: formData.number,
-            from: formData.from,
-            to: formData.to,
-            capacity: Number(formData.capacity),
-            booked: 0,
-          },
-        ])
+  useEffect(() => {
+    const fetchFlights = async () => {
+      try {
+        const response = await fetch("/api/flights")
+        if (response.ok) {
+          const data = await response.json()
+          if (Array.isArray(data)) {
+            setFlightData(data)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching flights:", error)
+      } finally {
+        setLoading(false)
       }
-      setFormData({ number: "", from: "", to: "", capacity: "" })
-      setShowAddFlight(false)
+    }
+
+    fetchFlights()
+  }, [])
+
+  const handleAddFlight = async () => {
+    if (formData.number && formData.from && formData.to && formData.capacity) {
+      try {
+        const flightPayload = {
+          flightNumber: formData.number,
+          from: formData.from,
+          to: formData.to,
+          capacity: Number(formData.capacity),
+          airline: "Admin Added",
+          departure: "00:00",
+          arrival: "00:00",
+          duration: "0h 0m",
+          price: 299,
+          seats: Number(formData.capacity),
+          stops: "Non-stop",
+          date: new Date().toISOString().split('T')[0],
+          booked: 0,
+        }
+
+        if (editingFlight) {
+          await fetch(`/api/flights?id=${editingFlight.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(flightPayload),
+          })
+        } else {
+          await fetch("/api/flights", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(flightPayload),
+          })
+        }
+
+        // Refresh flights list
+        const response = await fetch("/api/flights")
+        const data = await response.json()
+        if (Array.isArray(data)) {
+          setFlightData(data)
+        }
+
+        setFormData({ number: "", from: "", to: "", capacity: "" })
+        setShowAddFlight(false)
+        setEditingFlight(null)
+      } catch (error) {
+        console.error("Error saving flight:", error)
+      }
     }
   }
 
-  const handleEditFlight = (flight: (typeof initialFlightData)[0]) => {
+  const handleEditFlight = (flight: Flight) => {
     setEditingFlight(flight)
     setFormData({
-      number: flight.number,
+      number: flight.flightNumber,
       from: flight.from,
       to: flight.to,
       capacity: flight.capacity.toString(),
@@ -93,14 +123,29 @@ export function AdminPanel() {
     setShowAddFlight(true)
   }
 
-  const handleDeleteFlight = (id: number) => {
-    setFlightData(flightData.filter((f) => f.id !== id))
+  const handleDeleteFlight = async (id: string) => {
+    try {
+      await fetch(`/api/flights?id=${id}`, { method: "DELETE" })
+      setFlightData(flightData.filter((f) => f.id !== id))
+    } catch (error) {
+      console.error("Error deleting flight:", error)
+    }
   }
 
   const handleCancel = () => {
     setShowAddFlight(false)
     setEditingFlight(null)
     setFormData({ number: "", from: "", to: "", capacity: "" })
+  }
+
+  if (loading) {
+    return (
+      <section className="py-12 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 min-h-screen">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center text-white">Loading admin panel...</div>
+        </div>
+      </section>
+    )
   }
 
   return (
@@ -128,7 +173,9 @@ export function AdminPanel() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-400 mb-1">Total Bookings</p>
-                <p className="text-3xl font-bold text-white">{flightData.reduce((sum, f) => sum + f.booked, 0)}</p>
+                <p className="text-3xl font-bold text-white">
+                  {flightData.reduce((sum, f) => sum + (f.booked || 0), 0)}
+                </p>
               </div>
               <Users size={32} className="text-teal-400 opacity-20" />
             </div>
@@ -139,7 +186,7 @@ export function AdminPanel() {
               <div>
                 <p className="text-sm text-slate-400 mb-1">Total Revenue</p>
                 <p className="text-3xl font-bold text-white">
-                  ${(flightData.reduce((sum, f) => sum + f.booked, 0) * 299).toLocaleString()}
+                  ${(flightData.reduce((sum, f) => sum + (f.booked || 0), 0) * 299).toLocaleString()}
                 </p>
               </div>
               <DollarSign size={32} className="text-amber-400 opacity-20" />
@@ -153,7 +200,7 @@ export function AdminPanel() {
                 <p className="text-3xl font-bold text-white">
                   {flightData.length > 0
                     ? Math.round(
-                        (flightData.reduce((sum, f) => sum + f.booked, 0) /
+                        (flightData.reduce((sum, f) => sum + (f.booked || 0), 0) /
                           flightData.reduce((sum, f) => sum + f.capacity, 0)) *
                           100,
                       )
@@ -195,7 +242,8 @@ export function AdminPanel() {
                     <LineChart data={analyticsData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                       <XAxis dataKey="month" stroke="#94a3b8" />
-                      <YAxis stroke="#94a3b8" />
+                      <YAxis yAxisId="left" stroke="#94a3b8" />
+                      <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" />
                       <Tooltip contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #475569" }} />
                       <Legend />
                       <Line yAxisId="left" type="monotone" dataKey="bookings" stroke="#10b981" strokeWidth={2} />
@@ -225,6 +273,7 @@ export function AdminPanel() {
                         <Pie
                           data={analyticsData.slice(0, 4)}
                           dataKey="revenue"
+                          nameKey="month"
                           cx="50%"
                           cy="50%"
                           outerRadius={80}
@@ -326,22 +375,22 @@ export function AdminPanel() {
                     <tbody>
                       {flightData.map((flight) => (
                         <tr key={flight.id} className="border-b border-slate-700 hover:bg-slate-700/50">
-                          <td className="py-3 px-4 font-semibold text-white">{flight.number}</td>
+                          <td className="py-3 px-4 font-semibold text-white">{flight.flightNumber}</td>
                           <td className="py-3 px-4 text-slate-300">
                             {flight.from} → {flight.to}
                           </td>
                           <td className="py-3 px-4 text-slate-300">{flight.capacity}</td>
-                          <td className="py-3 px-4 text-slate-300">{flight.booked}</td>
+                          <td className="py-3 px-4 text-slate-300">{flight.booked || 0}</td>
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-2">
                               <div className="w-16 h-2 bg-slate-600 rounded-full overflow-hidden">
                                 <div
                                   className="h-full bg-gradient-to-r from-emerald-500 to-teal-500"
-                                  style={{ width: `${(flight.booked / flight.capacity) * 100}%` }}
+                                  style={{ width: `${((flight.booked || 0) / flight.capacity) * 100}%` }}
                                 />
                               </div>
                               <span className="text-sm font-semibold text-slate-200">
-                                {Math.round((flight.booked / flight.capacity) * 100)}%
+                                {Math.round(((flight.booked || 0) / flight.capacity) * 100)}%
                               </span>
                             </div>
                           </td>

@@ -14,7 +14,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/login');
+      // Use replace instead of push to prevent back button issues
+      router.replace('/login');
     }
   }, [user, loading, router]);
 
@@ -30,7 +31,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  // If not authenticated, don't render anything (redirect happens in useEffect)
+  // If not authenticated, show nothing while redirecting
   if (!user) {
     return null;
   }

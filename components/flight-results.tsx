@@ -1,79 +1,61 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Filter, Clock, Users, Plane } from "lucide-react"
 import Link from "next/link"
-
-const mockFlights = [
-  {
-    id: 1,
-    airline: "SkyWings",
-    flightNumber: "SW101",
-    departure: "08:00",
-    arrival: "12:30",
-    duration: "4h 30m",
-    price: 299,
-    seats: 12,
-    stops: "Non-stop",
-    from: "JFK",
-    to: "LAX",
-  },
-  {
-    id: 2,
-    airline: "AeroFly",
-    flightNumber: "AF205",
-    departure: "10:15",
-    arrival: "15:45",
-    duration: "5h 30m",
-    price: 249,
-    seats: 8,
-    stops: "Non-stop",
-    from: "JFK",
-    to: "LAX",
-  },
-  {
-    id: 3,
-    airline: "CloudJet",
-    flightNumber: "CJ312",
-    departure: "14:00",
-    arrival: "19:20",
-    duration: "5h 20m",
-    price: 199,
-    seats: 15,
-    stops: "1 Stop",
-    from: "JFK",
-    to: "LAX",
-  },
-  {
-    id: 4,
-    airline: "SkyWings",
-    flightNumber: "SW405",
-    departure: "16:30",
-    arrival: "21:00",
-    duration: "4h 30m",
-    price: 329,
-    seats: 5,
-    stops: "Non-stop",
-    from: "JFK",
-    to: "LAX",
-  },
-]
+import type { Flight } from "@/lib/types"
 
 export function FlightResults() {
+  const [flights, setFlights] = useState<Flight[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [priceFilter, setPriceFilter] = useState(500)
   const [selectedStops, setSelectedStops] = useState<string[]>(["Non-stop", "1 Stop"])
   const [selectedTimes, setSelectedTimes] = useState<string[]>(["Morning", "Afternoon", "Evening"])
 
-  const filteredFlights = mockFlights.filter((flight) => {
-    if (flight.price > priceFilter) return false
-    if (!selectedStops.includes(flight.stops)) return false
+  useEffect(() => {
+    const fetchFlights = async () => {
+      try {
+        const response = await fetch("/api/flights")
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch flights: ${response.status}`)
+        }
+        
+        const data = await response.json()
+        
+        // Ensure data is an array
+        if (Array.isArray(data)) {
+          setFlights(data)
+        } else {
+          console.error("API did not return an array:", data)
+          setFlights([])
+          setError("Invalid data format received from server")
+        }
+      } catch (error) {
+        console.error("Error fetching flights:", error)
+        setError("Failed to load flights. Please try again later.")
+        setFlights([])
+      } finally {
+        setLoading(false)
+      }
+    }
 
-    const hour = Number.parseInt(flight.departure.split(":")[0])
+    fetchFlights()
+  }, [])
+
+  // Safely filter flights with additional checks
+  const filteredFlights = Array.isArray(flights) ? flights.filter((flight) => {
+    if (!flight) return false
+    if (flight.price > priceFilter) return false
+    if (!selectedStops.includes(flight.stops || "Non-stop")) return false
+
+    const hour = Number.parseInt(flight.departure?.split(":")[0] || "0")
     const timeOfDay = hour >= 6 && hour < 12 ? "Morning" : hour >= 12 && hour < 18 ? "Afternoon" : "Evening"
     if (!selectedTimes.includes(timeOfDay)) return false
 
     return true
-  })
+  }) : []
 
   const toggleStop = (stop: string) => {
     setSelectedStops((prev) => (prev.includes(stop) ? prev.filter((s) => s !== stop) : [...prev, stop]))
@@ -81,6 +63,34 @@ export function FlightResults() {
 
   const toggleTime = (time: string) => {
     setSelectedTimes((prev) => (prev.includes(time) ? prev.filter((t) => t !== time) : [...prev, time]))
+  }
+
+  if (loading) {
+    return (
+      <section className="py-12 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 min-h-screen">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center text-white">Loading flights...</div>
+        </div>
+      </section>
+    )
+  }
+
+  if (error) {
+    return (
+      <section className="py-12 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 min-h-screen">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-6 text-center">
+            <p className="text-red-400 text-lg">{error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="mt-4 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </section>
+    )
   }
 
   return (
