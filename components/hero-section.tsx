@@ -20,7 +20,7 @@ export function HeroSection() {
           </div>
           <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 text-balance">Discover Your Next Adventure</h1>
           <p className="text-xl text-slate-300 max-w-2xl mx-auto text-balance">
-            Book flights to over 500 destinations worldwide with our modern, secure, and user-friendly airline
+            Book flights to over 50 destinations in the Philippines with our modern, secure, and user-friendly airline
             reservation system.
           </p>
         </div>
@@ -28,8 +28,8 @@ export function HeroSection() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16">
           <div className="bg-slate-800/50 backdrop-blur border border-emerald-500/20 rounded-xl p-8 hover:border-emerald-500/50 transition group">
             <div className="text-4xl mb-4 group-hover:scale-110 transition"></div>
-            <h3 className="font-semibold text-white mb-2 text-lg">Global Routes</h3>
-            <p className="text-slate-400">Access flights to over 500 destinations worldwide with competitive pricing</p>
+            <h3 className="font-semibold text-white mb-2 text-lg">PH Routes</h3>
+            <p className="text-slate-400">Access flights to over 50 destinations in the Philippines with competitive pricing</p>
           </div>
           <div className="bg-slate-800/50 backdrop-blur border border-emerald-500/20 rounded-xl p-8 hover:border-emerald-500/50 transition group">
             <div className="text-4xl mb-4 group-hover:scale-110 transition"></div>

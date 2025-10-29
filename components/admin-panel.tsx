@@ -16,8 +16,8 @@ import {
   Pie,
   Cell,
 } from "recharts"
-import { Plus, Edit2, Trash2, Users, Plane, DollarSign, TrendingUp, X } from "lucide-react"
-import type { Flight } from "@/lib/types"
+import { Plus, Edit2, Trash2, Users, Plane, DollarSign, TrendingUp, X, Search, Filter } from "lucide-react"
+import type { Flight, Booking, Passenger } from "@/lib/types"
 
 const analyticsData = [
   { month: "Jan", bookings: 400, revenue: 24000 },
@@ -30,38 +30,68 @@ const analyticsData = [
 
 const COLORS = ["#10b981", "#14b8a6", "#f59e0b", "#06b6d4"]
 
+interface EnrichedBooking extends Booking {
+  flight?: {
+    flightNumber: string
+    from: string
+    to: string
+    date: string
+    departure: string
+    arrival: string
+  }
+}
+
 export function AdminPanel() {
   const [activeTab, setActiveTab] = useState("overview")
   const [showAddFlight, setShowAddFlight] = useState(false)
   const [flightData, setFlightData] = useState<Flight[]>([])
+  const [bookingsData, setBookingsData] = useState<EnrichedBooking[]>([])
   const [editingFlight, setEditingFlight] = useState<Flight | null>(null)
   const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
   const [formData, setFormData] = useState({
     number: "",
     from: "",
     to: "",
     capacity: "",
+    departure: "",
+    arrival: "",
+    duration: "",
+    price: "",
+    date: "",
   })
 
   useEffect(() => {
-    const fetchFlights = async () => {
-      try {
-        const response = await fetch("/api/flights")
-        if (response.ok) {
-          const data = await response.json()
-          if (Array.isArray(data)) {
-            setFlightData(data)
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching flights:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchFlights()
+    fetchData()
   }, [])
+
+  const fetchData = async () => {
+    setLoading(true)
+    try {
+      // Fetch flights
+      const flightsResponse = await fetch("/api/flights")
+      if (flightsResponse.ok) {
+        const flights = await flightsResponse.json()
+        if (Array.isArray(flights)) {
+          setFlightData(flights)
+        }
+      }
+
+      // Fetch all bookings for admin
+      const bookingsResponse = await fetch("/api/admin/bookings")
+      if (bookingsResponse.ok) {
+        const bookings = await bookingsResponse.json()
+        if (Array.isArray(bookings)) {
+          setBookingsData(bookings)
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching data:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleAddFlight = async () => {
     if (formData.number && formData.from && formData.to && formData.capacity) {
@@ -71,44 +101,47 @@ export function AdminPanel() {
           from: formData.from,
           to: formData.to,
           capacity: Number(formData.capacity),
-          airline: "Admin Added",
-          departure: "00:00",
-          arrival: "00:00",
-          duration: "0h 0m",
-          price: 299,
+          airline: "Flight",
+          departure: formData.departure || "00:00",
+          arrival: formData.arrival || "00:00",
+          duration: formData.duration || "0h 0m",
+          price: Number(formData.price) || 299,
           seats: Number(formData.capacity),
           stops: "Non-stop",
-          date: new Date().toISOString().split('T')[0],
+          date: formData.date || new Date().toISOString().split('T')[0],
           booked: 0,
         }
 
+        let response
         if (editingFlight) {
-          await fetch(`/api/flights?id=${editingFlight.id}`, {
+          response = await fetch(`/api/flights?id=${editingFlight.id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(flightPayload),
           })
         } else {
-          await fetch("/api/flights", {
+          response = await fetch("/api/flights", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(flightPayload),
           })
         }
 
-        // Refresh flights list
-        const response = await fetch("/api/flights")
-        const data = await response.json()
-        if (Array.isArray(data)) {
-          setFlightData(data)
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || "Failed to save flight")
         }
 
-        setFormData({ number: "", from: "", to: "", capacity: "" })
+        await fetchData()
+        setFormData({ number: "", from: "", to: "", capacity: "", departure: "", arrival: "", duration: "", price: "", date: "" })
         setShowAddFlight(false)
         setEditingFlight(null)
       } catch (error) {
         console.error("Error saving flight:", error)
+        alert(`Failed to save flight: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
+    } else {
+      alert("Please fill in all required fields (Flight Number, From, To, Capacity)")
     }
   }
 
@@ -119,24 +152,77 @@ export function AdminPanel() {
       from: flight.from,
       to: flight.to,
       capacity: flight.capacity.toString(),
+      departure: flight.departure || "",
+      arrival: flight.arrival || "",
+      duration: flight.duration || "",
+      price: flight.price?.toString() || "",
+      date: flight.date || "",
     })
     setShowAddFlight(true)
   }
 
   const handleDeleteFlight = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this flight?")) return
+
     try {
-      await fetch(`/api/flights?id=${id}`, { method: "DELETE" })
-      setFlightData(flightData.filter((f) => f.id !== id))
+      const response = await fetch(`/api/flights?id=${id}`, { method: "DELETE" })
+      if (!response.ok) throw new Error("Failed to delete flight")
+      await fetchData()
     } catch (error) {
       console.error("Error deleting flight:", error)
+      alert("Failed to delete flight. Please try again.")
+    }
+  }
+
+  const handleUpdateBookingStatus = async (bookingId: string, newStatus: string) => {
+    try {
+      const response = await fetch(`/api/admin/bookings?id=${bookingId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      if (!response.ok) throw new Error("Failed to update booking")
+      await fetchData()
+    } catch (error) {
+      console.error("Error updating booking:", error)
+      alert("Failed to update booking. Please try again.")
+    }
+  }
+
+  const handleDeleteBooking = async (bookingId: string) => {
+    if (!confirm("Are you sure you want to delete this booking?")) return
+
+    try {
+      const response = await fetch(`/api/admin/bookings?id=${bookingId}`, { method: "DELETE" })
+      if (!response.ok) throw new Error("Failed to delete booking")
+      await fetchData()
+    } catch (error) {
+      console.error("Error deleting booking:", error)
+      alert("Failed to delete booking. Please try again.")
     }
   }
 
   const handleCancel = () => {
     setShowAddFlight(false)
     setEditingFlight(null)
-    setFormData({ number: "", from: "", to: "", capacity: "" })
+    setFormData({ number: "", from: "", to: "", capacity: "", departure: "", arrival: "", duration: "", price: "", date: "" })
   }
+
+  // Filter bookings based on search and status
+  const filteredBookings = bookingsData.filter((booking) => {
+    const matchesSearch = searchTerm === "" || 
+      booking.bookingRef.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      booking.flight?.flightNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      booking.passengers.some(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    
+    const matchesStatus = statusFilter === "all" || booking.status === statusFilter
+
+    return matchesSearch && matchesStatus
+  })
+
+  // Calculate total passengers
+  const totalPassengers = bookingsData.reduce((sum, booking) => sum + booking.passengers.length, 0)
+  const totalRevenue = bookingsData.reduce((sum, booking) => sum + booking.totalPrice, 0)
 
   if (loading) {
     return (
@@ -172,10 +258,8 @@ export function AdminPanel() {
           <div className="bg-slate-800 rounded-lg p-6 shadow-lg border border-teal-500/20">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400 mb-1">Total Bookings</p>
-                <p className="text-3xl font-bold text-white">
-                  {flightData.reduce((sum, f) => sum + (f.booked || 0), 0)}
-                </p>
+                <p className="text-sm text-slate-400 mb-1">Total Passengers</p>
+                <p className="text-3xl font-bold text-white">{totalPassengers}</p>
               </div>
               <Users size={32} className="text-teal-400 opacity-20" />
             </div>
@@ -185,9 +269,7 @@ export function AdminPanel() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-400 mb-1">Total Revenue</p>
-                <p className="text-3xl font-bold text-white">
-                  ${(flightData.reduce((sum, f) => sum + (f.booked || 0), 0) * 299).toLocaleString()}
-                </p>
+                <p className="text-3xl font-bold text-white">₱{totalRevenue.toLocaleString()}</p>
               </div>
               <DollarSign size={32} className="text-amber-400 opacity-20" />
             </div>
@@ -196,17 +278,8 @@ export function AdminPanel() {
           <div className="bg-slate-800 rounded-lg p-6 shadow-lg border border-cyan-500/20">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400 mb-1">Occupancy Rate</p>
-                <p className="text-3xl font-bold text-white">
-                  {flightData.length > 0
-                    ? Math.round(
-                        (flightData.reduce((sum, f) => sum + (f.booked || 0), 0) /
-                          flightData.reduce((sum, f) => sum + f.capacity, 0)) *
-                          100,
-                      )
-                    : 0}
-                  %
-                </p>
+                <p className="text-sm text-slate-400 mb-1">Total Bookings</p>
+                <p className="text-3xl font-bold text-white">{bookingsData.length}</p>
               </div>
               <TrendingUp size={32} className="text-cyan-400 opacity-20" />
             </div>
@@ -342,7 +415,42 @@ export function AdminPanel() {
                         onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
                         className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-slate-400"
                       />
-                      <div className="flex gap-2 md:col-span-2">
+                      <input
+                        type="time"
+                        placeholder="Departure"
+                        value={formData.departure}
+                        onChange={(e) => setFormData({ ...formData, departure: e.target.value })}
+                        className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-slate-400"
+                      />
+                      <input
+                        type="time"
+                        placeholder="Arrival"
+                        value={formData.arrival}
+                        onChange={(e) => setFormData({ ...formData, arrival: e.target.value })}
+                        className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-slate-400"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Duration (e.g., 2h 30m)"
+                        value={formData.duration}
+                        onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                        className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-slate-400"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Price"
+                        value={formData.price}
+                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                        className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-slate-400"
+                      />
+                      <input
+                        type="date"
+                        placeholder="Date"
+                        value={formData.date}
+                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                        className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-slate-400"
+                      />
+                      <div className="flex gap-2 md:col-span-3">
                         <button
                           onClick={handleAddFlight}
                           className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-semibold"
@@ -366,6 +474,7 @@ export function AdminPanel() {
                       <tr className="border-b border-slate-700">
                         <th className="text-left py-3 px-4 font-semibold text-slate-200">Flight</th>
                         <th className="text-left py-3 px-4 font-semibold text-slate-200">Route</th>
+                        <th className="text-left py-3 px-4 font-semibold text-slate-200">Date</th>
                         <th className="text-left py-3 px-4 font-semibold text-slate-200">Capacity</th>
                         <th className="text-left py-3 px-4 font-semibold text-slate-200">Booked</th>
                         <th className="text-left py-3 px-4 font-semibold text-slate-200">Occupancy</th>
@@ -379,6 +488,7 @@ export function AdminPanel() {
                           <td className="py-3 px-4 text-slate-300">
                             {flight.from} → {flight.to}
                           </td>
+                          <td className="py-3 px-4 text-slate-300">{flight.date}</td>
                           <td className="py-3 px-4 text-slate-300">{flight.capacity}</td>
                           <td className="py-3 px-4 text-slate-300">{flight.booked || 0}</td>
                           <td className="py-3 px-4">
@@ -418,46 +528,126 @@ export function AdminPanel() {
 
             {activeTab === "passengers" && (
               <div>
-                <h3 className="text-lg font-semibold text-white mb-6">Passenger List</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-slate-700">
-                        <th className="text-left py-3 px-4 font-semibold text-slate-200">Name</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-200">Flight</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-200">Seat</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-200">Status</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-200">Booking Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        { name: "John Doe", flight: "SW101", seat: "12A", status: "Confirmed", date: "2024-12-01" },
-                        { name: "Jane Smith", flight: "SW101", seat: "12B", status: "Confirmed", date: "2024-12-01" },
-                        { name: "Bob Johnson", flight: "SW202", seat: "5C", status: "Checked In", date: "2024-12-02" },
-                        { name: "Alice Brown", flight: "AF305", seat: "8A", status: "Confirmed", date: "2024-12-03" },
-                      ].map((passenger, idx) => (
-                        <tr key={idx} className="border-b border-slate-700 hover:bg-slate-700/50">
-                          <td className="py-3 px-4 font-semibold text-white">{passenger.name}</td>
-                          <td className="py-3 px-4 text-slate-300">{passenger.flight}</td>
-                          <td className="py-3 px-4 text-slate-300">{passenger.seat}</td>
-                          <td className="py-3 px-4">
-                            <span
-                              className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                                passenger.status === "Confirmed"
-                                  ? "bg-emerald-500/20 text-emerald-300"
-                                  : "bg-teal-500/20 text-teal-300"
-                              }`}
-                            >
-                              {passenger.status}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-slate-300">{passenger.date}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-lg font-semibold text-white">Passenger Bookings</h3>
+                  <div className="flex gap-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                      <input
+                        type="text"
+                        placeholder="Search bookings..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-slate-400"
+                      />
+                    </div>
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="pending">Pending</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
                 </div>
+
+                {filteredBookings.length === 0 ? (
+                  <div className="text-center text-slate-400 py-12">
+                    <Users size={48} className="mx-auto mb-4 opacity-50" />
+                    <p>No bookings found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredBookings.map((booking) => (
+                      <div key={booking.id} className="bg-slate-700 rounded-lg p-6 border border-slate-600">
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <div className="flex items-center gap-3 mb-2">
+                              <h4 className="font-semibold text-white text-lg">
+                                Booking #{booking.bookingRef}
+                              </h4>
+                              <span
+                                className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                                  booking.status === "confirmed"
+                                    ? "bg-emerald-500/20 text-emerald-300"
+                                    : booking.status === "pending"
+                                    ? "bg-amber-500/20 text-amber-300"
+                                    : booking.status === "cancelled"
+                                    ? "bg-red-500/20 text-red-300"
+                                    : "bg-teal-500/20 text-teal-300"
+                                }`}
+                              >
+                                {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                              </span>
+                            </div>
+                            {booking.flight && (
+                              <div className="text-slate-300 mb-2">
+                                <span className="font-semibold text-emerald-400">{booking.flight.flightNumber}</span>
+                                {" • "}
+                                {booking.flight.from} → {booking.flight.to}
+                                {" • "}
+                                {booking.flight.date} at {booking.flight.departure}
+                              </div>
+                            )}
+                            <div className="text-sm text-slate-400">
+                              Booked: {new Date(booking.createdAt).toLocaleDateString()}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-2xl font-bold text-white mb-2">
+                              ${booking.totalPrice.toLocaleString()}
+                            </div>
+                            <div className="flex gap-2">
+                              <select
+                                value={booking.status}
+                                onChange={(e) => handleUpdateBookingStatus(booking.id, e.target.value)}
+                                className="px-3 py-1 bg-slate-600 border border-slate-500 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              >
+                                <option value="pending">Pending</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
+                              </select>
+                              <button
+                                onClick={() => handleDeleteBooking(booking.id)}
+                                className="p-2 text-red-400 hover:bg-slate-600 rounded transition"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="border-t border-slate-600 pt-4">
+                          <h5 className="font-semibold text-white mb-3">Passengers ({booking.passengers.length})</h5>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {booking.passengers.map((passenger, idx) => (
+                              <div key={idx} className="bg-slate-600 rounded p-3">
+                                <div className="font-semibold text-white">{passenger.name}</div>
+                                <div className="text-sm text-slate-300">{passenger.email}</div>
+                                <div className="text-sm text-slate-400">{passenger.phone}</div>
+                                {passenger.seatAssignment && (
+                                  <div className="text-sm text-emerald-400 font-semibold mt-1">
+                                    Seat: {passenger.seatAssignment}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          {booking.selectedSeats && booking.selectedSeats.length > 0 && (
+                            <div className="mt-3 text-sm text-slate-400">
+                              Selected Seats: {booking.selectedSeats.join(", ")}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

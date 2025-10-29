@@ -1,4 +1,4 @@
-// components/booking-page.tsx - FIXED VERSION
+// components/booking-page.tsx - FIRESTORE INTEGRATED VERSION
 "use client"
 
 import { useState, useEffect } from "react"
@@ -17,35 +17,48 @@ export function BookingPage() {
   const [passengers, setPassengers] = useState<Passenger[]>([{ name: "", email: "", phone: "" }])
   const [step, setStep] = useState<"seats" | "passengers" | "confirm">("seats")
   const [loading, setLoading] = useState(true)
+  const [reservedSeats, setReservedSeats] = useState<string[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
+  // Fetch flight and reserved seats
   useEffect(() => {
-    const fetchFlight = async () => {
+    const fetchFlightData = async () => {
       if (!flightId) {
+        setError("No flight selected")
         setLoading(false)
         return
       }
       
       try {
-        const response = await fetch(`/api/flights?id=${flightId}`)
-        if (response.ok) {
-          const data = await response.json()
-          setFlight(data[0])
+        // Fetch flight details
+        const flightResponse = await fetch(`/api/flights/${flightId}`)
+        if (!flightResponse.ok) {
+          throw new Error("Flight not found")
+        }
+        const flightData = await flightResponse.json()
+        setFlight(flightData)
+
+        // Fetch reserved seats
+        const seatsResponse = await fetch(`/api/flights/${flightId}/seats`)
+        if (seatsResponse.ok) {
+          const seatsData = await seatsResponse.json()
+          setReservedSeats(seatsData.reservedSeats || [])
         }
       } catch (error) {
-        console.error("Error fetching flight:", error)
+        console.error("Error fetching flight data:", error)
+        setError("Failed to load flight details")
       } finally {
         setLoading(false)
       }
     }
 
-    fetchFlight()
+    fetchFlightData()
   }, [flightId])
 
   const toggleSeat = (seatId: string) => {
     setSelectedSeats((prev) => (prev.includes(seatId) ? prev.filter((s) => s !== seatId) : [...prev, seatId]))
   }
-
-  const reservedSeats = ["2A", "2B", "3C", "5A", "7B", "8A", "8B", "8C"]
 
   const updatePassenger = (index: number, field: keyof Passenger, value: string) => {
     const newPassengers = [...passengers]
@@ -54,16 +67,46 @@ export function BookingPage() {
   }
 
   const addPassenger = () => {
-    setPassengers([...passengers, { name: "", email: "", phone: "" }])
+    if (passengers.length < selectedSeats.length) {
+      setPassengers([...passengers, { name: "", email: "", phone: "" }])
+    } else {
+      alert("You can only add passengers up to the number of selected seats")
+    }
   }
 
   const removePassenger = (index: number) => {
-    setPassengers(passengers.filter((_, i) => i !== index))
+    if (passengers.length > 1) {
+      setPassengers(passengers.filter((_, i) => i !== index))
+    }
+  }
+
+  const validatePassengers = () => {
+    if (passengers.length !== selectedSeats.length) {
+      alert(`Please add exactly ${selectedSeats.length} passenger(s) for ${selectedSeats.length} seat(s)`)
+      return false
+    }
+
+    for (let i = 0; i < passengers.length; i++) {
+      const p = passengers[i]
+      if (!p.name.trim() || !p.email.trim() || !p.phone.trim()) {
+        alert(`Please fill in all details for Passenger ${i + 1}`)
+        return false
+      }
+      
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(p.email)) {
+        alert(`Please enter a valid email for Passenger ${i + 1}`)
+        return false
+      }
+    }
+
+    return true
   }
 
   const basePrice = flight?.price || 299
   const taxesPerSeat = 45
-  const totalPrice = (basePrice + taxesPerSeat) * (selectedSeats.length || 1)
+  const totalPrice = (basePrice + taxesPerSeat) * selectedSeats.length
 
   const handleCompleteBooking = async () => {
     if (!user?.uid || !flight) {
@@ -71,23 +114,27 @@ export function BookingPage() {
       return
     }
 
+    if (!validatePassengers()) {
+      return
+    }
+
+    setSubmitting(true)
+    setError(null)
+
     try {
       // Map passengers to include seat assignments
       const passengersWithSeats: Passenger[] = passengers.map((p, index) => ({
         ...p,
-        seatAssignment: selectedSeats[index] || selectedSeats[0]
+        seatAssignment: selectedSeats[index]
       }))
 
-      const bookingData: Omit<Booking, 'id'> = {
+      const bookingData = {
         userId: user.uid,
         flightId: flight.id,
         passengers: passengersWithSeats,
         selectedSeats: selectedSeats,
-        status: "confirmed",
         totalPrice,
         bookingRef: `${flight.flightNumber}-${Date.now()}`,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       }
 
       const response = await fetch("/api/bookings", {
@@ -96,37 +143,67 @@ export function BookingPage() {
         body: JSON.stringify(bookingData),
       })
 
+      const data = await response.json()
+
       if (response.ok) {
-        alert("Booking confirmed! Check your dashboard for details.")
-        window.location.href = "/dashboard"
+        // Redirect to confirmation page with booking ID
+        window.location.href = `/booking-confirmation?bookingId=${data.bookingId}`
+      } else if (response.status === 409) {
+        // Seat conflict
+        alert(`Sorry, the following seats are no longer available: ${data.conflictingSeats?.join(", ") || "some seats"}. Please select different seats.`)
+        setStep("seats")
+        // Refresh reserved seats
+        const seatsResponse = await fetch(`/api/flights/${flightId}/seats`)
+        if (seatsResponse.ok) {
+          const seatsData = await seatsResponse.json()
+          setReservedSeats(seatsData.reservedSeats || [])
+        }
+        setSelectedSeats([])
       } else {
-        alert("Failed to complete booking. Please try again.")
+        alert(data.error || "Failed to complete booking. Please try again.")
       }
     } catch (error) {
       console.error("Error completing booking:", error)
       alert("Failed to complete booking. Please try again.")
+    } finally {
+      setSubmitting(false)
     }
   }
 
   if (!user) {
-    return null
+    return (
+      <section className="py-12 bg-gray-50 min-h-screen">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Please log in to book a flight</h2>
+            <a href="/login" className="text-blue-600 hover:underline">Go to Login</a>
+          </div>
+        </div>
+      </section>
+    )
   }
 
   if (loading) {
     return (
       <section className="py-12 bg-gray-50 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">Loading flight details...</div>
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p className="mt-4 text-gray-600">Loading flight details...</p>
+          </div>
         </div>
       </section>
     )
   }
 
-  if (!flight) {
+  if (error || !flight) {
     return (
       <section className="py-12 bg-gray-50 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">Flight not found</div>
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">{error || "Flight not found"}</h2>
+            <a href="/search" className="text-blue-600 hover:underline">Back to Search</a>
+          </div>
         </div>
       </section>
     )
@@ -168,6 +245,12 @@ export function BookingPage() {
             {step === "seats" && (
               <div className="bg-white rounded-lg p-8 shadow-sm border border-gray-200">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Select Your Seats</h2>
+
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-gray-700">
+                    <span className="font-semibold">Available Seats:</span> {flight.seats} of {flight.capacity}
+                  </p>
+                </div>
 
                 <div className="mb-8 flex gap-6 justify-center flex-wrap">
                   <div className="flex items-center gap-2">
@@ -243,12 +326,20 @@ export function BookingPage() {
               <div className="bg-white rounded-lg p-8 shadow-sm border border-gray-200">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">Passenger Information</h2>
 
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-gray-700">
+                    Please provide details for <span className="font-semibold">{selectedSeats.length} passenger(s)</span>
+                  </p>
+                </div>
+
                 <div className="space-y-6">
                   {passengers.map((passenger, index) => (
                     <div key={index} className="p-6 border border-gray-200 rounded-lg">
                       <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-semibold text-gray-900">Passenger {index + 1}</h3>
-                        {passengers.length > 1 && (
+                        <h3 className="font-semibold text-gray-900">
+                          Passenger {index + 1} {selectedSeats[index] && `- Seat ${selectedSeats[index]}`}
+                        </h3>
+                        {passengers.length > 1 && index >= 1 && (
                           <button
                             onClick={() => removePassenger(index)}
                             className="text-red-600 hover:text-red-700 text-sm font-semibold"
@@ -260,34 +351,43 @@ export function BookingPage() {
 
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Full Name <span className="text-red-600">*</span>
+                          </label>
                           <input
                             type="text"
                             value={passenger.name}
                             onChange={(e) => updatePassenger(index, "name", e.target.value)}
                             placeholder="John Doe"
+                            required
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Email</label>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Email <span className="text-red-600">*</span>
+                          </label>
                           <input
                             type="email"
                             value={passenger.email}
                             onChange={(e) => updatePassenger(index, "email", e.target.value)}
                             placeholder="john@example.com"
+                            required
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                           />
                         </div>
 
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Phone</label>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Phone <span className="text-red-600">*</span>
+                          </label>
                           <input
                             type="tel"
                             value={passenger.phone}
                             onChange={(e) => updatePassenger(index, "phone", e.target.value)}
                             placeholder="+1 (555) 123-4567"
+                            required
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                           />
                         </div>
@@ -296,12 +396,14 @@ export function BookingPage() {
                   ))}
                 </div>
 
-                <button
-                  onClick={addPassenger}
-                  className="mt-6 w-full py-2 border-2 border-blue-600 text-blue-600 font-semibold rounded-lg hover:bg-blue-50 transition"
-                >
-                  + Add Another Passenger
-                </button>
+                {passengers.length < selectedSeats.length && (
+                  <button
+                    onClick={addPassenger}
+                    className="mt-6 w-full py-2 border-2 border-blue-600 text-blue-600 font-semibold rounded-lg hover:bg-blue-50 transition"
+                  >
+                    + Add Another Passenger
+                  </button>
+                )}
 
                 <div className="flex gap-4 mt-6">
                   <button
@@ -311,7 +413,11 @@ export function BookingPage() {
                     Back
                   </button>
                   <button
-                    onClick={() => setStep("confirm")}
+                    onClick={() => {
+                      if (validatePassengers()) {
+                        setStep("confirm")
+                      }
+                    }}
                     className="flex-1 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
                   >
                     Review Booking
@@ -353,10 +459,11 @@ export function BookingPage() {
                     <div className="space-y-2">
                       {passengers.map((passenger, index) => (
                         <div key={index} className="text-sm text-gray-700">
-                          <p>
-                            <span className="font-semibold">Passenger {index + 1}:</span>{" "}
-                            {passenger.name || "Not provided"}
+                          <p className="font-semibold">
+                            Passenger {index + 1} - Seat {selectedSeats[index]}
                           </p>
+                          <p>{passenger.name}</p>
+                          <p className="text-gray-600">{passenger.email} • {passenger.phone}</p>
                         </div>
                       ))}
                     </div>
@@ -366,15 +473,24 @@ export function BookingPage() {
                 <div className="flex gap-4 mt-6">
                   <button
                     onClick={() => setStep("passengers")}
-                    className="flex-1 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition"
+                    disabled={submitting}
+                    className="flex-1 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Back
                   </button>
                   <button
                     onClick={handleCompleteBooking}
-                    className="flex-1 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition"
+                    disabled={submitting}
+                    className="flex-1 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Complete Booking
+                    {submitting ? (
+                      <>
+                        <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Processing...
+                      </>
+                    ) : (
+                      "Complete Booking"
+                    )}
                   </button>
                 </div>
               </div>
@@ -424,7 +540,7 @@ export function BookingPage() {
 
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-gray-700">
-                  <span>Base Fare</span>
+                  <span>Base Fare ({selectedSeats.length || 1}x)</span>
                   <span>${basePrice * (selectedSeats.length || 1)}</span>
                 </div>
                 <div className="flex justify-between text-gray-700">

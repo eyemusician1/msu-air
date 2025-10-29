@@ -1,5 +1,5 @@
 // Firestore utility functions for database operations
-import { collection, doc, getDoc, getDocs, addDoc, updateDoc, query, where, getFirestore } from "firebase/firestore"
+import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, getFirestore, orderBy } from "firebase/firestore"
 import { app } from "./firebase"
 import type { Flight, Booking, User } from "./types"
 
@@ -78,6 +78,16 @@ export async function updateFlight(flightId: string, updates: Partial<Flight>): 
   }
 }
 
+export async function deleteFlight(flightId: string): Promise<void> {
+  try {
+    const flightDoc = doc(db, "flights", flightId)
+    await deleteDoc(flightDoc)
+  } catch (error) {
+    console.error("Error deleting flight:", error)
+    throw error
+  }
+}
+
 // ============ BOOKINGS ============
 
 export async function getBookings(userId: string): Promise<Booking[]> {
@@ -91,6 +101,61 @@ export async function getBookings(userId: string): Promise<Booking[]> {
     })) as Booking[]
   } catch (error) {
     console.error("Error fetching bookings:", error)
+    throw error
+  }
+}
+
+export async function getReservedSeatsForFlight(flightId: string): Promise<string[]> {
+  try {
+    const bookingsCollection = collection(db, "bookings")
+    const q = query(
+      bookingsCollection, 
+      where("flightId", "==", flightId),
+      where("status", "in", ["confirmed", "pending"])
+    )
+    const snapshot = await getDocs(q)
+    
+    const reservedSeats: string[] = []
+    snapshot.docs.forEach((doc) => {
+      const booking = doc.data() as Booking
+      if (booking.selectedSeats) {
+        reservedSeats.push(...booking.selectedSeats)
+      }
+    })
+    
+    return reservedSeats
+  } catch (error) {
+    console.error("Error fetching reserved seats:", error)
+    throw error
+  }
+}
+
+export async function getAllBookings(): Promise<Booking[]> {
+  try {
+    const bookingsCollection = collection(db, "bookings")
+    const q = query(bookingsCollection, orderBy("createdAt", "desc"))
+    const snapshot = await getDocs(q)
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Booking[]
+  } catch (error) {
+    console.error("Error fetching all bookings:", error)
+    throw error
+  }
+}
+
+export async function getBookingsByFlight(flightId: string): Promise<Booking[]> {
+  try {
+    const bookingsCollection = collection(db, "bookings")
+    const q = query(bookingsCollection, where("flightId", "==", flightId))
+    const snapshot = await getDocs(q)
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Booking[]
+  } catch (error) {
+    console.error("Error fetching bookings by flight:", error)
     throw error
   }
 }
@@ -142,6 +207,16 @@ export async function cancelBooking(bookingId: string): Promise<void> {
     await updateBooking(bookingId, { status: "cancelled" })
   } catch (error) {
     console.error("Error cancelling booking:", error)
+    throw error
+  }
+}
+
+export async function deleteBooking(bookingId: string): Promise<void> {
+  try {
+    const bookingDoc = doc(db, "bookings", bookingId)
+    await deleteDoc(bookingDoc)
+  } catch (error) {
+    console.error("Error deleting booking:", error)
     throw error
   }
 }
