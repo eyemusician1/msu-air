@@ -541,15 +541,15 @@ export function BookingPage() {
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-gray-700">
                   <span>Base Fare ({selectedSeats.length || 1}x)</span>
-                  <span>${basePrice * (selectedSeats.length || 1)}</span>
+                  <span>₱{basePrice * (selectedSeats.length || 1)}</span>
                 </div>
                 <div className="flex justify-between text-gray-700">
                   <span>Taxes & Fees</span>
-                  <span>${taxesPerSeat * (selectedSeats.length || 1)}</span>
+                  <span>₱{taxesPerSeat * (selectedSeats.length || 1)}</span>
                 </div>
                 <div className="flex justify-between font-bold text-lg text-gray-900 pt-3 border-t border-gray-200">
                   <span>Total</span>
-                  <span className="text-blue-600">${totalPrice}</span>
+                  <span className="text-blue-600">₱{totalPrice}</span>
                 </div>
               </div>
 

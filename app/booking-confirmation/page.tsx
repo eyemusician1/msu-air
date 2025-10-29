@@ -261,16 +261,16 @@ export default function BookingConfirmationPage() {
             <div className="space-y-3 mb-6">
               <div className="flex justify-between text-gray-700">
                 <span>Base Fare ({booking.selectedSeats.length} seat{booking.selectedSeats.length > 1 ? 's' : ''})</span>
-                <span className="font-semibold">${basePrice * booking.selectedSeats.length}</span>
+                <span className="font-semibold">₱{basePrice * booking.selectedSeats.length}</span>
               </div>
               <div className="flex justify-between text-gray-700">
                 <span>Taxes & Fees</span>
-                <span className="font-semibold">${taxesPerSeat * booking.selectedSeats.length}</span>
+                <span className="font-semibold">₱{taxesPerSeat * booking.selectedSeats.length}</span>
               </div>
               <div className="border-t-2 border-gray-300 pt-3 mt-3">
                 <div className="flex justify-between items-center">
                   <span className="text-xl font-bold text-gray-900">Total Amount Paid</span>
-                  <span className="text-2xl font-bold text-blue-600">${totalPrice}</span>
+                  <span className="text-2xl font-bold text-blue-600">₱{totalPrice}</span>
                 </div>
               </div>
             </div>
@@ -308,7 +308,7 @@ export default function BookingConfirmationPage() {
           {/* Footer */}
           <div className="p-6 bg-gray-100 text-center text-sm text-gray-600">
             <p className="mb-2">For any queries or changes, please contact our customer service</p>
-            <p className="font-semibold text-gray-900">support@airline.com | +1 (800) 123-4567</p>
+            <p className="font-semibold text-gray-900">support@airline.com | +63 906 355 7013</p>
             <p className="mt-4 text-xs text-gray-500">
               This is an electronic receipt. No signature required.
             </p>
