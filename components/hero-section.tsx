@@ -27,17 +27,17 @@ export function HeroSection() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-16">
           <div className="bg-slate-800/50 backdrop-blur border border-emerald-500/20 rounded-xl p-8 hover:border-emerald-500/50 transition group">
-            <div className="text-4xl mb-4 group-hover:scale-110 transition">🌍</div>
+            <div className="text-4xl mb-4 group-hover:scale-110 transition"></div>
             <h3 className="font-semibold text-white mb-2 text-lg">Global Routes</h3>
             <p className="text-slate-400">Access flights to over 500 destinations worldwide with competitive pricing</p>
           </div>
           <div className="bg-slate-800/50 backdrop-blur border border-emerald-500/20 rounded-xl p-8 hover:border-emerald-500/50 transition group">
-            <div className="text-4xl mb-4 group-hover:scale-110 transition">💰</div>
+            <div className="text-4xl mb-4 group-hover:scale-110 transition"></div>
             <h3 className="font-semibold text-white mb-2 text-lg">Best Prices</h3>
             <p className="text-slate-400">Guaranteed lowest fares with our price match guarantee and exclusive deals</p>
           </div>
           <div className="bg-slate-800/50 backdrop-blur border border-emerald-500/20 rounded-xl p-8 hover:border-emerald-500/50 transition group">
-            <div className="text-4xl mb-4 group-hover:scale-110 transition">⚡</div>
+            <div className="text-4xl mb-4 group-hover:scale-110 transition"></div>
             <h3 className="font-semibold text-white mb-2 text-lg">Instant Booking</h3>
             <p className="text-slate-400">Book and confirm your flight in seconds with our streamlined checkout</p>
           </div>
