@@ -1,6 +1,6 @@
 // lib/firebase.ts
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
+import { getAuth, type Auth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -11,8 +11,27 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase only if it hasn't been initialized
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-const auth = getAuth(app);
+// Lazy initialization
+let _app: FirebaseApp | undefined;
+let _auth: Auth | undefined;
 
-export { app, auth };
+export const app = new Proxy({} as FirebaseApp, {
+  get(_, prop) {
+    if (!_app) {
+      _app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+    }
+    return (_app as any)[prop];
+  }
+});
+
+export const auth = new Proxy({} as Auth, {
+  get(_, prop) {
+    if (!_auth) {
+      if (!_app) {
+        _app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+      }
+      _auth = getAuth(_app);
+    }
+    return (_auth as any)[prop];
+  }
+});
