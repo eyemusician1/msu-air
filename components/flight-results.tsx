@@ -1,75 +1,92 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Filter, Clock, Users, Plane } from "lucide-react"
-import Link from "next/link"
+import { AlertCircle, Filter } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { FlightFilters } from "./flight-filters"
+import { FlightCard } from "./flight-card"
+import { SearchSummary } from "./search-summary"
 import type { Flight } from "@/lib/types"
 
 export function FlightResults() {
+  const searchParams = useSearchParams()
   const [flights, setFlights] = useState<Flight[]>([])
+  const [filteredFlights, setFilteredFlights] = useState<Flight[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [priceFilter, setPriceFilter] = useState(500)
-  const [selectedStops, setSelectedStops] = useState<string[]>(["Non-stop", "1 Stop"])
-  const [selectedTimes, setSelectedTimes] = useState<string[]>(["Morning", "Afternoon", "Evening"])
+  const [filtersOpen, setFiltersOpen] = useState(true)
+  const [directFlightsOnly, setDirectFlightsOnly] = useState(false)
+
+  // Get search parameters
+  const from = searchParams.get("from")
+  const to = searchParams.get("to")
+  const departDate = searchParams.get("departDate")
+  const directOnly = searchParams.get("directFlightsOnly") === "true"
+
+  useEffect(() => {
+    setDirectFlightsOnly(directOnly)
+  }, [directOnly])
 
   useEffect(() => {
     const fetchFlights = async () => {
       try {
-        const response = await fetch("/api/flights")
-        
+        setLoading(true)
+        const params = new URLSearchParams()
+        if (from) params.append("from", from)
+        if (to) params.append("to", to)
+        if (departDate) params.append("date", departDate)
+
+        const response = await fetch(`/api/flights?${params.toString()}`)
+
         if (!response.ok) {
           throw new Error(`Failed to fetch flights: ${response.status}`)
         }
-        
+
         const data = await response.json()
-        
-        // Ensure data is an array
+
         if (Array.isArray(data)) {
-          setFlights(data)
+          let processedFlights = data
+
+          // Apply direct flights filter if requested
+          if (directFlightsOnly) {
+            processedFlights = processedFlights.filter((f) => f.stops === "Non-stop")
+          }
+
+          setFlights(processedFlights)
+          setFilteredFlights(processedFlights)
         } else {
           console.error("API did not return an array:", data)
           setFlights([])
+          setFilteredFlights([])
           setError("Invalid data format received from server")
         }
       } catch (error) {
         console.error("Error fetching flights:", error)
         setError("Failed to load flights. Please try again later.")
         setFlights([])
+        setFilteredFlights([])
       } finally {
         setLoading(false)
       }
     }
 
     fetchFlights()
-  }, [])
+  }, [from, to, departDate])
 
-  // Safely filter flights with additional checks
-  const filteredFlights = Array.isArray(flights) ? flights.filter((flight) => {
-    if (!flight) return false
-    if (flight.price > priceFilter) return false
-    if (!selectedStops.includes(flight.stops || "Non-stop")) return false
-
-    const hour = Number.parseInt(flight.departure?.split(":")[0] || "0")
-    const timeOfDay = hour >= 6 && hour < 12 ? "Morning" : hour >= 12 && hour < 18 ? "Afternoon" : "Evening"
-    if (!selectedTimes.includes(timeOfDay)) return false
-
-    return true
-  }) : []
-
-  const toggleStop = (stop: string) => {
-    setSelectedStops((prev) => (prev.includes(stop) ? prev.filter((s) => s !== stop) : [...prev, stop]))
-  }
-
-  const toggleTime = (time: string) => {
-    setSelectedTimes((prev) => (prev.includes(time) ? prev.filter((t) => t !== time) : [...prev, time]))
+  const handleFiltersChange = (filtered: Flight[]) => {
+    setFilteredFlights(filtered)
   }
 
   if (loading) {
     return (
       <section className="py-12 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center text-white">Loading flights...</div>
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
+              <p className="text-slate-300">Loading flights...</p>
+            </div>
+          </div>
         </div>
       </section>
     )
@@ -79,14 +96,18 @@ export function FlightResults() {
     return (
       <section className="py-12 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-6 text-center">
-            <p className="text-red-400 text-lg">{error}</p>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="mt-4 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-            >
-              Retry
-            </button>
+          <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-6 flex items-start gap-4">
+            <AlertCircle className="text-red-400 flex-shrink-0 mt-1" size={20} />
+            <div className="flex-1">
+              <p className="text-red-400 font-semibold mb-2">Error Loading Flights</p>
+              <p className="text-red-300 text-sm">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-4 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium text-sm"
+              >
+                Retry
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -96,156 +117,51 @@ export function FlightResults() {
   return (
     <section className="py-12 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SearchSummary />
+
+        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Flight Results</h1>
-        
-          <p className="text-sm text-slate-400 mt-2">{filteredFlights.length} flights found</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-400">
+              {from && to && (
+                <>
+                  <span className="font-semibold text-emerald-400">{from}</span> to{" "}
+                  <span className="font-semibold text-emerald-400">{to}</span> •{" "}
+                </>
+              )}
+              <span className="font-semibold text-emerald-400">{filteredFlights.length}</span> flights found
+            </p>
+            <button
+              onClick={() => setFiltersOpen(!filtersOpen)}
+              className="lg:hidden flex items-center gap-2 px-4 py-2 bg-slate-700/50 hover:bg-slate-700 text-slate-300 rounded-lg transition"
+            >
+              <Filter size={18} /> Filters
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Filters */}
+          {/* Filters Sidebar */}
           <div className="lg:col-span-1">
-            <div className="bg-slate-800 rounded-lg p-6 shadow-lg border border-emerald-500/20 sticky top-20">
-              <div className="flex items-center gap-2 mb-6">
-                <Filter size={20} className="text-emerald-400" />
-                <h3 className="font-semibold text-white">Filters</h3>
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <label className="text-sm font-semibold text-slate-200 mb-3 block">Price Range</label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="15000"
-                    value={priceFilter}
-                    onChange={(e) => setPriceFilter(Number(e.target.value))}
-                    className="w-full accent-emerald-500"
-                  />
-                  <p className="text-sm text-emerald-400 mt-2 font-semibold">Up to ₱{priceFilter}</p>
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-slate-200 mb-3 block">Stops</label>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedStops.includes("Non-stop")}
-                        onChange={() => toggleStop("Non-stop")}
-                        className="rounded accent-emerald-500"
-                      />
-                      <span className="text-sm text-slate-300">Non-stop</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedStops.includes("1 Stop")}
-                        onChange={() => toggleStop("1 Stop")}
-                        className="rounded accent-emerald-500"
-                      />
-                      <span className="text-sm text-slate-300">1 Stop</span>
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-slate-200 mb-3 block">Departure Time</label>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedTimes.includes("Morning")}
-                        onChange={() => toggleTime("Morning")}
-                        className="rounded accent-emerald-500"
-                      />
-                      <span className="text-sm text-slate-300">Morning (6am - 12pm)</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedTimes.includes("Afternoon")}
-                        onChange={() => toggleTime("Afternoon")}
-                        className="rounded accent-emerald-500"
-                      />
-                      <span className="text-sm text-slate-300">Afternoon (12pm - 6pm)</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedTimes.includes("Evening")}
-                        onChange={() => toggleTime("Evening")}
-                        className="rounded accent-emerald-500"
-                      />
-                      <span className="text-sm text-slate-300">Evening (6pm - 12am)</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
+            <div className={`${filtersOpen ? "block" : "hidden"} lg:block`}>
+              <FlightFilters flights={flights} onFiltersChange={handleFiltersChange} />
             </div>
           </div>
 
-          {/* Flight Cards */}
+          {/* Flight Results */}
           <div className="lg:col-span-3 space-y-4">
             {filteredFlights.length > 0 ? (
-              filteredFlights.map((flight) => (
-                <div
-                  key={flight.id}
-                  className="bg-slate-800 rounded-lg p-6 shadow-lg border border-slate-700 hover:border-teal-500/50 hover:shadow-teal-500/10 transition"
-                >
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-3">
-                        <Plane size={18} className="text-emerald-400" />
-                        <span className="font-semibold text-white">{flight.airline}</span>
-                        <span className="text-sm text-slate-400">{flight.flightNumber}</span>
-                      </div>
-
-                      <div className="flex items-center gap-4 mb-3">
-                        <div>
-                          <p className="text-2xl font-bold text-white">{flight.departure}</p>
-                          <p className="text-sm text-slate-400">Departure</p>
-                        </div>
-                        <div className="flex-1 flex items-center gap-2">
-                          <div className="flex-1 h-0.5 bg-slate-700" />
-                          <Clock size={16} className="text-slate-500" />
-                          <div className="flex-1 h-0.5 bg-slate-700" />
-                        </div>
-                        <div>
-                          <p className="text-2xl font-bold text-white">{flight.arrival}</p>
-                          <p className="text-sm text-slate-400">Arrival</p>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-4 text-sm text-slate-400">
-                        <span>{flight.duration}</span>
-                        <span>•</span>
-                        <span>{flight.stops}</span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
-                          <Users size={14} /> {flight.seats} seats left
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-3">
-                      <div>
-                        <p className="text-3xl font-bold text-emerald-400">₱{flight.price}</p>
-                        <p className="text-sm text-slate-400">per person</p>
-                      </div>
-                      <Link
-                        href={`/booking?flightId=${flight.id}`}
-                        className="px-6 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-600 hover:to-teal-600 transition font-semibold"
-                      >
-                        Book Now
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-              ))
+              <>
+                {filteredFlights.map((flight, idx) => (
+                  <FlightCard key={flight.id} flight={flight} isPopular={idx === 0 && filteredFlights.length > 1} />
+                ))}
+              </>
             ) : (
               <div className="bg-slate-800 rounded-lg p-12 text-center border border-slate-700">
-                <p className="text-slate-300 text-lg">No flights match your filters. Try adjusting your criteria.</p>
+                <AlertCircle className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+                <p className="text-slate-300 text-lg font-semibold mb-2">No flights found</p>
+                <p className="text-slate-400 text-sm">Try adjusting your filters or search criteria</p>
               </div>
             )}
           </div>

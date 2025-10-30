@@ -32,7 +32,7 @@ export function Navbar() {
             <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-lg flex items-center justify-center">
               <span className="text-slate-900 font-bold text-lg">✈</span>
             </div>
-            <span className="font-bold text-xl text-white">SkyWings</span>
+            <span className="font-bold text-xl text-white">MSU Airlines</span>
           </Link>
 
           <div className="hidden md:flex items-center gap-8">
