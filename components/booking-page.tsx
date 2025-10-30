@@ -358,7 +358,7 @@ export function BookingPage() {
                             type="text"
                             value={passenger.name}
                             onChange={(e) => updatePassenger(index, "name", e.target.value)}
-                            placeholder="John Doe"
+                            placeholder="Your Name"
                             required
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                           />
@@ -372,7 +372,7 @@ export function BookingPage() {
                             type="email"
                             value={passenger.email}
                             onChange={(e) => updatePassenger(index, "email", e.target.value)}
-                            placeholder="john@example.com"
+                            placeholder="you@example.com"
                             required
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                           />
@@ -386,7 +386,7 @@ export function BookingPage() {
                             type="tel"
                             value={passenger.phone}
                             onChange={(e) => updatePassenger(index, "phone", e.target.value)}
-                            placeholder="+1 (555) 123-4567"
+                            placeholder="+63 123 456 7890"
                             required
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
                           />
