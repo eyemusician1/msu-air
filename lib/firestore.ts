@@ -240,18 +240,24 @@ export async function getUserById(userId: string): Promise<User | null> {
 export async function createUser(userId: string, user: Omit<User, "id" | "createdAt" | "updatedAt">): Promise<void> {
   try {
     const userDoc = doc(db, "users", userId)
-    await updateDoc(userDoc, {
-      ...user,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }).catch(() => {
-      // If document doesn't exist, create it
-      return addDoc(collection(db, "users"), {
+    const userDocSnapshot = await getDoc(userDoc)
+    
+    if (!userDocSnapshot.exists()) {
+      // Create new user document with setDoc instead of addDoc
+      const { setDoc } = await import("firebase/firestore")
+      await setDoc(userDoc, {
         ...user,
+        role: user.role || "user", // Default to "user" if not specified
         createdAt: new Date(),
         updatedAt: new Date(),
       })
-    })
+    } else {
+      // Update existing document
+      await updateDoc(userDoc, {
+        ...user,
+        updatedAt: new Date(),
+      })
+    }
   } catch (error) {
     console.error("Error creating user:", error)
     throw error

@@ -6,7 +6,7 @@ export function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div>
-            <h3 className="font-bold text-lg mb-4">MSU Airlines</h3>
+            <h3 className="font-bold text-lg mb-4">Skyrithm</h3>
             <p className="text-gray-400">Your trusted partner for seamless air travel</p>
           </div>
           <div>

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import {
-  User,
+  User as FirebaseUser,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
@@ -13,10 +13,14 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { getUserById, createUser } from '@/lib/firestore';
+import type { User } from '@/lib/types';
 
 interface AuthContextType {
-  user: User | null;
+  user: FirebaseUser | null;
+  userProfile: User | null;  // ADD THIS
   loading: boolean;
+  isAdmin: boolean;  // ADD THIS
   signUp: (email: string, password: string, name: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -35,12 +39,38 @@ export const useAuth = () => {
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [userProfile, setUserProfile] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
+      
+      if (firebaseUser) {
+        // Fetch user profile from Firestore
+        try {
+          const profile = await getUserById(firebaseUser.uid);
+          if (profile) {
+            setUserProfile(profile);
+          } else {
+            // Create user profile if it doesn't exist
+            const newProfile: Omit<User, "id" | "createdAt" | "updatedAt"> = {
+              email: firebaseUser.email || "",
+              displayName: firebaseUser.displayName || "",
+              role: "user", // Default role
+            };
+            await createUser(firebaseUser.uid, newProfile);
+            const createdProfile = await getUserById(firebaseUser.uid);
+            setUserProfile(createdProfile);
+          }
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+        }
+      } else {
+        setUserProfile(null);
+      }
+      
       setLoading(false);
     });
 
@@ -51,6 +81,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     if (userCredential.user) {
       await updateProfile(userCredential.user, { displayName: name });
+      
+      // Create user profile in Firestore
+      const newProfile: Omit<User, "id" | "createdAt" | "updatedAt"> = {
+        email: email,
+        displayName: name,
+        role: "user",
+      };
+      await createUser(userCredential.user.uid, newProfile);
     }
   };
 
@@ -60,22 +98,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     await signOut(auth);
-    // Force page reload to clear all state
     window.location.href = '/login';
   };
 
   const loginWithGoogle = async () => {
+  try {
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
-  };
+    const result = await signInWithPopup(auth, provider);
+    
+    if (result.user) {
+      // The useEffect hook will handle profile creation
+      console.log("Google sign-in successful:", result.user.email);
+    }
+  } catch (error: any) {
+    console.error("Google login error:", error);
+    console.error("Error code:", error.code);
+    console.error("Error message:", error.message);
+    
+    // Handle specific error cases
+    if (error.code === 'auth/popup-closed-by-user') {
+      throw new Error('Sign-in cancelled');
+    } else if (error.code === 'auth/unauthorized-domain') {
+      throw new Error('This domain is not authorized for Google sign-in');
+    } else {
+      throw error;
+    }
+  }
+};
 
   const resetPassword = async (email: string) => {
     await sendPasswordResetEmail(auth, email);
   };
 
+  const isAdmin = userProfile?.role === "admin";
+
   const value = {
     user,
+    userProfile,
     loading,
+    isAdmin,
     signUp,
     login,
     logout,

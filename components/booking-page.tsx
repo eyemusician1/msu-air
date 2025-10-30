@@ -553,7 +553,7 @@ export function BookingPage() {
                 </div>
               </div>
 
-              <p className="text-xs text-gray-500 text-center">By confirming, you agree to our terms and conditions</p>
+              <p className="text-xs text-gray-500 text-center">By confirming, you agree to our terms and conditions.</p>
             </div>
           </div>
         </div>

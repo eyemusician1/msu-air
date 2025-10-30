@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Plane, Calendar, User, Mail, Phone, MapPin, CheckCircle, Download, Printer } from "lucide-react"
+import { Plane, Calendar, MapPin, Users, CreditCard, CheckCircle2, Download, Printer, ArrowRight } from "lucide-react"
 import type { Booking, Flight } from "@/lib/types"
 
 export default function BookingConfirmationPage() {
   const searchParams = useSearchParams()
   const bookingId = searchParams.get("bookingId")
-  
+
   const [booking, setBooking] = useState<Booking | null>(null)
   const [flight, setFlight] = useState<Flight | null>(null)
   const [loading, setLoading] = useState(true)
@@ -21,13 +21,11 @@ export default function BookingConfirmationPage() {
       }
 
       try {
-        // Fetch booking details
         const response = await fetch(`/api/bookings/${bookingId}`)
         if (response.ok) {
           const bookingData = await response.json()
           setBooking(bookingData)
 
-          // Fetch flight details
           const flightResponse = await fetch(`/api/flights/${bookingData.flightId}`)
           if (flightResponse.ok) {
             const flightData = await flightResponse.json()
@@ -49,15 +47,14 @@ export default function BookingConfirmationPage() {
   }
 
   const handleDownloadPDF = () => {
-    // Simple print to PDF functionality
     window.print()
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mb-4"></div>
           <p className="text-gray-600">Loading your booking details...</p>
         </div>
       </div>
@@ -66,10 +63,12 @@ export default function BookingConfirmationPage() {
 
   if (!booking || !flight) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Booking Not Found</h2>
-          <a href="/search" className="text-blue-600 hover:underline">Return to Search</a>
+          <a href="/search" className="text-emerald-600 hover:underline">
+            Return to Search
+          </a>
         </div>
       </div>
     )
@@ -80,238 +79,192 @@ export default function BookingConfirmationPage() {
   const totalPrice = booking.totalPrice
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-8 sm:py-12">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Success Message - Hide when printing */}
-        <div className="mb-8 text-center print:hidden">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-            <CheckCircle className="w-10 h-10 text-green-600" />
+        <div className="mb-8 text-center print:hidden animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-100 rounded-full mb-4">
+            <CheckCircle2 className="w-10 h-10 text-emerald-600" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Booking Confirmed!</h1>
-          <p className="text-gray-600">Your flight has been successfully booked</p>
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Booking Confirmed!</h1>
+          <p className="text-gray-600">Your flight reservation is complete. Check your email for details.</p>
         </div>
 
         {/* Action Buttons - Hide when printing */}
-        <div className="flex gap-4 mb-6 print:hidden">
+        <div className="flex gap-3 mb-8 print:hidden justify-center">
           <button
             onClick={handlePrint}
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
+            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-white text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition border border-gray-200 shadow-sm"
           >
-            <Printer size={20} />
-            Print Receipt
+            <Printer size={18} />
+            <span className="hidden sm:inline">Print</span>
           </button>
           <button
             onClick={handleDownloadPDF}
-            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gray-700 text-white font-semibold rounded-lg hover:bg-gray-800 transition"
+            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition shadow-sm"
           >
-            <Download size={20} />
-            Save as PDF
+            <Download size={18} />
+            <span className="hidden sm:inline">Save PDF</span>
           </button>
         </div>
 
         {/* Receipt Card */}
-        <div id="receipt" className="bg-white rounded-lg shadow-lg overflow-hidden print:shadow-none">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-8">
-            <div className="flex items-center justify-between mb-4">
+        <div
+          id="receipt"
+          className="bg-white rounded-2xl shadow-lg overflow-hidden print:shadow-none print:rounded-none"
+        >
+          {/* Header Section */}
+          <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white p-6 sm:p-8">
+            <div className="flex items-start justify-between mb-6">
               <div>
-                <h2 className="text-2xl font-bold mb-1">Flight Booking Receipt</h2>
-                <p className="text-blue-100">Thank you for choosing our airline</p>
+                <p className="text-emerald-100 text-sm font-medium mb-1">BOOKING CONFIRMATION</p>
+                <h2 className="text-2xl sm:text-3xl font-bold">Your Flight is Booked</h2>
               </div>
-              <Plane size={48} className="opacity-80" />
+              <Plane size={40} className="opacity-80" />
             </div>
-            <div className="border-t border-blue-500 pt-4 mt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-blue-100 text-sm mb-1">Booking Reference</p>
-                  <p className="text-xl font-bold tracking-wider">{booking.bookingRef}</p>
-                </div>
-                <div>
-                  <p className="text-blue-100 text-sm mb-1">Booking Date</p>
-                  <p className="text-lg font-semibold">
-                    {new Date(booking.createdAt).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </p>
-                </div>
-              </div>
+
+            {/* Booking Reference */}
+            <div className="bg-emerald-500 bg-opacity-30 rounded-lg p-4 backdrop-blur-sm">
+              <p className="text-emerald-100 text-xs font-medium mb-1">BOOKING REFERENCE</p>
+              <p className="text-2xl font-mono font-bold tracking-wider">{booking.bookingRef}</p>
             </div>
           </div>
 
-          {/* Flight Details */}
-          <div className="p-8 border-b border-gray-200">
-            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <Plane className="text-blue-600" size={24} />
-              Flight Information
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
+          {/* Main Content */}
+          <div className="p-6 sm:p-8">
+            {/* Flight Route Section */}
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-2">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Flight Number</p>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {flight.airline} {flight.flightNumber}
-                  </p>
+                  <p className="text-gray-500 text-sm font-medium mb-1">FROM</p>
+                  <p className="text-3xl font-bold text-gray-900">{flight.from}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Route</p>
-                  <div className="flex items-center gap-3">
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-gray-900">{flight.from}</p>
-                    </div>
-                    <div className="flex-1 border-t-2 border-dashed border-gray-300 relative">
-                      <Plane size={16} className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-blue-600 rotate-90" />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-2xl font-bold text-gray-900">{flight.to}</p>
-                    </div>
+                <div className="flex flex-col items-center gap-2">
+                  <ArrowRight className="text-emerald-600" size={24} />
+                  <p className="text-xs text-gray-500 font-medium">{flight.duration}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-gray-500 text-sm font-medium mb-1">TO</p>
+                  <p className="text-3xl font-bold text-gray-900">{flight.to}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Flight Details Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8 pb-8 border-b border-gray-200">
+              <div>
+                <p className="text-gray-500 text-xs font-medium mb-2 flex items-center gap-1">
+                  <Calendar size={14} /> DATE
+                </p>
+                <p className="text-gray-900 font-semibold">{flight.date}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 text-xs font-medium mb-2">DEPARTURE</p>
+                <p className="text-gray-900 font-semibold">{flight.departure}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 text-xs font-medium mb-2">ARRIVAL</p>
+                <p className="text-gray-900 font-semibold">{flight.arrival}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 text-xs font-medium mb-2">FLIGHT</p>
+                <p className="text-gray-900 font-semibold">
+                  {flight.airline} {flight.flightNumber}
+                </p>
+              </div>
+            </div>
+
+            {/* Seats Section */}
+            <div className="mb-8">
+              <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+                <MapPin size={16} className="text-emerald-600" />
+                SEAT ASSIGNMENTS
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {booking.selectedSeats.map((seat) => (
+                  <div
+                    key={seat}
+                    className="px-3 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 font-semibold rounded-lg text-sm"
+                  >
+                    {seat}
                   </div>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Date</p>
-                  <p className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                    <Calendar size={18} className="text-blue-600" />
-                    {flight.date}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Departure Time</p>
-                  <p className="text-lg font-semibold text-gray-900">{flight.departure}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Arrival Time</p>
-                  <p className="text-lg font-semibold text-gray-900">{flight.arrival}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Duration</p>
-                  <p className="text-lg font-semibold text-gray-900">{flight.duration}</p>
-                </div>
+                ))}
               </div>
             </div>
-          </div>
 
-          {/* Seat Information */}
-          <div className="p-8 border-b border-gray-200 bg-gray-50">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Seat Assignments</h3>
-            <div className="flex flex-wrap gap-3">
-              {booking.selectedSeats.map((seat) => (
-                <div
-                  key={seat}
-                  className="px-4 py-2 bg-blue-600 text-white font-bold rounded-lg text-lg"
-                >
-                  {seat}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Passenger Information */}
-          <div className="p-8 border-b border-gray-200">
-            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-              <User className="text-blue-600" size={24} />
-              Passenger Details
-            </h3>
-            <div className="space-y-6">
-              {booking.passengers.map((passenger, index) => (
-                <div key={index} className="bg-gray-50 p-6 rounded-lg">
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className="font-bold text-gray-900 text-lg">
-                      Passenger {index + 1}
-                    </h4>
+            {/* Passengers Section */}
+            <div className="mb-8 pb-8 border-b border-gray-200">
+              <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Users size={16} className="text-emerald-600" />
+                PASSENGERS
+              </h3>
+              <div className="space-y-3">
+                {booking.passengers.map((passenger, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="font-semibold text-gray-900">{passenger.name}</p>
+                      <p className="text-xs text-gray-600">{passenger.email}</p>
+                    </div>
                     {passenger.seatAssignment && (
-                      <span className="px-3 py-1 bg-blue-600 text-white font-semibold rounded-lg">
-                        Seat {passenger.seatAssignment}
+                      <span className="px-3 py-1 bg-emerald-600 text-white text-xs font-semibold rounded-full">
+                        {passenger.seatAssignment}
                       </span>
                     )}
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1 flex items-center gap-2">
-                        <User size={14} />
-                        Full Name
-                      </p>
-                      <p className="font-semibold text-gray-900">{passenger.name}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1 flex items-center gap-2">
-                        <Mail size={14} />
-                        Email
-                      </p>
-                      <p className="font-semibold text-gray-900">{passenger.email}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1 flex items-center gap-2">
-                        <Phone size={14} />
-                        Phone
-                      </p>
-                      <p className="font-semibold text-gray-900">{passenger.phone}</p>
-                    </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Price Breakdown */}
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6">
+              <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <CreditCard size={16} className="text-emerald-600" />
+                PRICE BREAKDOWN
+              </h3>
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Base Fare ({booking.selectedSeats.length}x)</span>
+                  <span className="text-gray-900 font-medium">₱{basePrice * booking.selectedSeats.length}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Taxes & Fees</span>
+                  <span className="text-gray-900 font-medium">₱{taxesPerSeat * booking.selectedSeats.length}</span>
+                </div>
+                <div className="border-t border-gray-200 pt-3 mt-3">
+                  <div className="flex justify-between items-center">
+                    <span className="font-semibold text-gray-900">Total Amount</span>
+                    <span className="text-2xl font-bold text-emerald-600">₱{totalPrice}</span>
                   </div>
                 </div>
-              ))}
+              </div>
             </div>
           </div>
 
-          {/* Price Breakdown */}
-          <div className="p-8 bg-gray-50">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">Payment Summary</h3>
-            <div className="space-y-3 mb-6">
-              <div className="flex justify-between text-gray-700">
-                <span>Base Fare ({booking.selectedSeats.length} seat{booking.selectedSeats.length > 1 ? 's' : ''})</span>
-                <span className="font-semibold">₱{basePrice * booking.selectedSeats.length}</span>
-              </div>
-              <div className="flex justify-between text-gray-700">
-                <span>Taxes & Fees</span>
-                <span className="font-semibold">₱{taxesPerSeat * booking.selectedSeats.length}</span>
-              </div>
-              <div className="border-t-2 border-gray-300 pt-3 mt-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-xl font-bold text-gray-900">Total Amount Paid</span>
-                  <span className="text-2xl font-bold text-blue-600">₱{totalPrice}</span>
-                </div>
-              </div>
+          {/* Footer Section */}
+          <div className="bg-gray-50 px-6 sm:px-8 py-6 border-t border-gray-200">
+            <div className="mb-4">
+              <h4 className="text-sm font-bold text-gray-900 mb-3">IMPORTANT REMINDERS</h4>
+              <ul className="space-y-2 text-sm text-gray-700">
+                <li className="flex gap-2">
+                  <span className="text-emerald-600 font-bold">•</span>
+                  <span>Arrive 2 hours before departure</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-emerald-600 font-bold">•</span>
+                  <span>Bring valid government-issued ID</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="text-emerald-600 font-bold">•</span>
+                  <span>Baggage: 1 carry-on (7kg) + 1 checked (23kg)</span>
+                </li>
+              </ul>
             </div>
-            <div className="bg-green-100 border border-green-300 rounded-lg p-4">
-              <p className="text-green-800 font-semibold flex items-center gap-2">
-                <CheckCircle size={20} />
-                Payment Status: Confirmed
+            <div className="pt-4 border-t border-gray-200 text-center text-xs text-gray-600">
+              <p className="mb-1">
+                For support: <span className="font-semibold text-gray-900">support@airline.com</span>
               </p>
+              <p>+63 906 355 7013</p>
             </div>
-          </div>
-
-          {/* Important Information */}
-          <div className="p-8 bg-blue-50 border-t-2 border-blue-200">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Important Information</h3>
-            <ul className="space-y-2 text-sm text-gray-700">
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>Please arrive at the airport at least 2 hours before departure</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>Carry a valid government-issued photo ID</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>Check-in opens 3 hours before departure</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-blue-600 font-bold">•</span>
-                <span>Baggage allowance: 1 carry-on (7kg) + 1 checked bag (23kg)</span>
-              </li>
-            </ul>
-          </div>
-
-          {/* Footer */}
-          <div className="p-6 bg-gray-100 text-center text-sm text-gray-600">
-            <p className="mb-2">For any queries or changes, please contact our customer service</p>
-            <p className="font-semibold text-gray-900">support@airline.com | +63 906 355 7013</p>
-            <p className="mt-4 text-xs text-gray-500">
-              This is an electronic receipt. No signature required.
-            </p>
           </div>
         </div>
 
@@ -319,7 +272,7 @@ export default function BookingConfirmationPage() {
         <div className="mt-8 text-center print:hidden">
           <a
             href="/dashboard"
-            className="inline-block px-8 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition"
+            className="inline-block px-8 py-3 bg-white text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition border border-gray-200 shadow-sm"
           >
             Go to Dashboard
           </a>
@@ -337,6 +290,9 @@ export default function BookingConfirmationPage() {
           }
           .print\\:shadow-none {
             box-shadow: none !important;
+          }
+          .print\\:rounded-none {
+            border-radius: 0 !important;
           }
         }
       `}</style>

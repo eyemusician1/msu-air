@@ -45,6 +45,7 @@ export interface User {
   displayName: string
   phone?: string
   passport?: string
+  role?: "user" | "admin"  // ADD THIS LINE
   createdAt: Date
   updatedAt: Date
 }

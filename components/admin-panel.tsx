@@ -16,17 +16,8 @@ import {
   Pie,
   Cell,
 } from "recharts"
-import { Plus, Edit2, Trash2, Users, Plane, DollarSign, TrendingUp, X, Search, Filter } from "lucide-react"
-import type { Flight, Booking, Passenger } from "@/lib/types"
-
-const analyticsData = [
-  { month: "Jan", bookings: 400, revenue: 24000 },
-  { month: "Feb", bookings: 520, revenue: 31200 },
-  { month: "Mar", bookings: 480, revenue: 28800 },
-  { month: "Apr", bookings: 610, revenue: 36600 },
-  { month: "May", bookings: 700, revenue: 42000 },
-  { month: "Jun", bookings: 850, revenue: 51000 },
-]
+import { Plus, Edit2, Trash2, Users, Plane, DollarSign, TrendingUp, X, Search } from "lucide-react"
+import type { Flight, Booking } from "@/lib/types"
 
 const COLORS = ["#10b981", "#14b8a6", "#f59e0b", "#06b6d4"]
 
@@ -41,11 +32,21 @@ interface EnrichedBooking extends Booking {
   }
 }
 
+interface AnalyticsData {
+  totalBookings: number
+  totalPassengers: number
+  totalRevenue: number
+  totalFlights: number
+  monthlyData: Array<{ month: string; bookings: number; revenue: number }>
+  revenueDistribution: Array<{ month: string; revenue: number }>
+}
+
 export function AdminPanel() {
   const [activeTab, setActiveTab] = useState("overview")
   const [showAddFlight, setShowAddFlight] = useState(false)
   const [flightData, setFlightData] = useState<Flight[]>([])
   const [bookingsData, setBookingsData] = useState<EnrichedBooking[]>([])
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
   const [editingFlight, setEditingFlight] = useState<Flight | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -64,12 +65,13 @@ export function AdminPanel() {
 
   useEffect(() => {
     fetchData()
+    const interval = setInterval(fetchData, 30000)
+    return () => clearInterval(interval)
   }, [])
 
   const fetchData = async () => {
     setLoading(true)
     try {
-      // Fetch flights
       const flightsResponse = await fetch("/api/flights")
       if (flightsResponse.ok) {
         const flights = await flightsResponse.json()
@@ -78,13 +80,18 @@ export function AdminPanel() {
         }
       }
 
-      // Fetch all bookings for admin
       const bookingsResponse = await fetch("/api/admin/bookings")
       if (bookingsResponse.ok) {
         const bookings = await bookingsResponse.json()
         if (Array.isArray(bookings)) {
           setBookingsData(bookings)
         }
+      }
+
+      const analyticsResponse = await fetch("/api/admin/analytics")
+      if (analyticsResponse.ok) {
+        const analytics = await analyticsResponse.json()
+        setAnalyticsData(analytics)
       }
     } catch (error) {
       console.error("Error fetching data:", error)
@@ -108,7 +115,7 @@ export function AdminPanel() {
           price: Number(formData.price) || 299,
           seats: Number(formData.capacity),
           stops: "Non-stop",
-          date: formData.date || new Date().toISOString().split('T')[0],
+          date: formData.date || new Date().toISOString().split("T")[0],
           booked: 0,
         }
 
@@ -133,12 +140,22 @@ export function AdminPanel() {
         }
 
         await fetchData()
-        setFormData({ number: "", from: "", to: "", capacity: "", departure: "", arrival: "", duration: "", price: "", date: "" })
+        setFormData({
+          number: "",
+          from: "",
+          to: "",
+          capacity: "",
+          departure: "",
+          arrival: "",
+          duration: "",
+          price: "",
+          date: "",
+        })
         setShowAddFlight(false)
         setEditingFlight(null)
       } catch (error) {
         console.error("Error saving flight:", error)
-        alert(`Failed to save flight: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        alert(`Failed to save flight: ${error instanceof Error ? error.message : "Unknown error"}`)
       }
     } else {
       alert("Please fill in all required fields (Flight Number, From, To, Capacity)")
@@ -205,24 +222,33 @@ export function AdminPanel() {
   const handleCancel = () => {
     setShowAddFlight(false)
     setEditingFlight(null)
-    setFormData({ number: "", from: "", to: "", capacity: "", departure: "", arrival: "", duration: "", price: "", date: "" })
+    setFormData({
+      number: "",
+      from: "",
+      to: "",
+      capacity: "",
+      departure: "",
+      arrival: "",
+      duration: "",
+      price: "",
+      date: "",
+    })
   }
 
-  // Filter bookings based on search and status
   const filteredBookings = bookingsData.filter((booking) => {
-    const matchesSearch = searchTerm === "" || 
+    const matchesSearch =
+      searchTerm === "" ||
       booking.bookingRef.toLowerCase().includes(searchTerm.toLowerCase()) ||
       booking.flight?.flightNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      booking.passengers.some(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
-    
+      booking.passengers.some((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+
     const matchesStatus = statusFilter === "all" || booking.status === statusFilter
 
     return matchesSearch && matchesStatus
   })
 
-  // Calculate total passengers
-  const totalPassengers = bookingsData.reduce((sum, booking) => sum + booking.passengers.length, 0)
-  const totalRevenue = bookingsData.reduce((sum, booking) => sum + booking.totalPrice, 0)
+  const displayAnalyticsData = analyticsData?.monthlyData || []
+  const displayRevenueDistribution = analyticsData?.revenueDistribution || []
 
   if (loading) {
     return (
@@ -249,7 +275,7 @@ export function AdminPanel() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-400 mb-1">Total Flights</p>
-                <p className="text-3xl font-bold text-white">{flightData.length}</p>
+                <p className="text-3xl font-bold text-white">{analyticsData?.totalFlights || 0}</p>
               </div>
               <Plane size={32} className="text-emerald-400 opacity-20" />
             </div>
@@ -259,7 +285,7 @@ export function AdminPanel() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-400 mb-1">Total Passengers</p>
-                <p className="text-3xl font-bold text-white">{totalPassengers}</p>
+                <p className="text-3xl font-bold text-white">{analyticsData?.totalPassengers || 0}</p>
               </div>
               <Users size={32} className="text-teal-400 opacity-20" />
             </div>
@@ -269,7 +295,7 @@ export function AdminPanel() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-400 mb-1">Total Revenue</p>
-                <p className="text-3xl font-bold text-white">₱{totalRevenue.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-white">₱{(analyticsData?.totalRevenue || 0).toLocaleString()}</p>
               </div>
               <DollarSign size={32} className="text-amber-400 opacity-20" />
             </div>
@@ -279,7 +305,7 @@ export function AdminPanel() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-400 mb-1">Total Bookings</p>
-                <p className="text-3xl font-bold text-white">{bookingsData.length}</p>
+                <p className="text-3xl font-bold text-white">{analyticsData?.totalBookings || 0}</p>
               </div>
               <TrendingUp size={32} className="text-cyan-400 opacity-20" />
             </div>
@@ -312,7 +338,7 @@ export function AdminPanel() {
                 <div>
                   <h3 className="text-lg font-semibold text-white mb-4">Bookings & Revenue Trend</h3>
                   <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={analyticsData}>
+                    <LineChart data={displayAnalyticsData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                       <XAxis dataKey="month" stroke="#94a3b8" />
                       <YAxis yAxisId="left" stroke="#94a3b8" />
@@ -329,7 +355,7 @@ export function AdminPanel() {
                   <div>
                     <h3 className="text-lg font-semibold text-white mb-4">Monthly Bookings</h3>
                     <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={analyticsData}>
+                      <BarChart data={displayAnalyticsData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                         <XAxis dataKey="month" stroke="#94a3b8" />
                         <YAxis stroke="#94a3b8" />
@@ -344,7 +370,7 @@ export function AdminPanel() {
                     <ResponsiveContainer width="100%" height={300}>
                       <PieChart>
                         <Pie
-                          data={analyticsData.slice(0, 4)}
+                          data={displayRevenueDistribution}
                           dataKey="revenue"
                           nameKey="month"
                           cx="50%"
@@ -352,7 +378,7 @@ export function AdminPanel() {
                           outerRadius={80}
                           label
                         >
-                          {analyticsData.slice(0, 4).map((_, index) => (
+                          {displayRevenueDistribution.map((_, index) => (
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Pie>
@@ -567,18 +593,16 @@ export function AdminPanel() {
                         <div className="flex justify-between items-start mb-4">
                           <div>
                             <div className="flex items-center gap-3 mb-2">
-                              <h4 className="font-semibold text-white text-lg">
-                                Booking #{booking.bookingRef}
-                              </h4>
+                              <h4 className="font-semibold text-white text-lg">Booking #{booking.bookingRef}</h4>
                               <span
                                 className={`px-3 py-1 rounded-full text-sm font-semibold ${
                                   booking.status === "confirmed"
                                     ? "bg-emerald-500/20 text-emerald-300"
                                     : booking.status === "pending"
-                                    ? "bg-amber-500/20 text-amber-300"
-                                    : booking.status === "cancelled"
-                                    ? "bg-red-500/20 text-red-300"
-                                    : "bg-teal-500/20 text-teal-300"
+                                      ? "bg-amber-500/20 text-amber-300"
+                                      : booking.status === "cancelled"
+                                        ? "bg-red-500/20 text-red-300"
+                                        : "bg-teal-500/20 text-teal-300"
                                 }`}
                               >
                                 {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
@@ -599,7 +623,7 @@ export function AdminPanel() {
                           </div>
                           <div className="text-right">
                             <div className="text-2xl font-bold text-white mb-2">
-                              ${booking.totalPrice.toLocaleString()}
+                              ₱{booking.totalPrice.toLocaleString()}
                             </div>
                             <div className="flex gap-2">
                               <select
