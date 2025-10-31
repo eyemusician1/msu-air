@@ -16,7 +16,7 @@ import {
   Pie,
   Cell,
 } from "recharts"
-import { Plus, Edit2, Trash2, Users, Plane, DollarSign, TrendingUp, X, Search } from "lucide-react"
+import { Plus, Edit2, Trash2, Users, Plane, DollarSign, TrendingUp, X, Search, PhilippinePeso } from "lucide-react"
 import type { Flight, Booking } from "@/lib/types"
 
 const COLORS = ["#10b981", "#14b8a6", "#f59e0b", "#06b6d4"]
@@ -235,17 +235,17 @@ export function AdminPanel() {
     })
   }
 
-  const filteredBookings = bookingsData.filter((booking) => {
-    const matchesSearch =
-      searchTerm === "" ||
-      booking.bookingRef.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      booking.flight?.flightNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      booking.passengers.some((p) => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+ const filteredBookings = bookingsData.filter((booking) => {
+  const matchesSearch =
+    searchTerm === "" ||
+    booking.bookingRef.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    booking.flight?.flightNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    booking.passengers.some((p) => p.name?.toLowerCase().includes(searchTerm.toLowerCase()))
 
-    const matchesStatus = statusFilter === "all" || booking.status === statusFilter
+  const matchesStatus = statusFilter === "all" || booking.status === statusFilter
 
-    return matchesSearch && matchesStatus
-  })
+  return matchesSearch && matchesStatus
+})
 
   const displayAnalyticsData = analyticsData?.monthlyData || []
   const displayRevenueDistribution = analyticsData?.revenueDistribution || []
@@ -297,7 +297,7 @@ export function AdminPanel() {
                 <p className="text-sm text-slate-400 mb-1">Total Revenue</p>
                 <p className="text-3xl font-bold text-white">₱{(analyticsData?.totalRevenue || 0).toLocaleString()}</p>
               </div>
-              <DollarSign size={32} className="text-amber-400 opacity-20" />
+              <PhilippinePeso size={32} className="text-amber-400 opacity-20" />
             </div>
           </div>
 

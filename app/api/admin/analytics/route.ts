@@ -1,108 +1,135 @@
-import { getAllBookings, getBookingById, updateBooking, deleteBooking, getFlightById } from "@/lib/firestore"
-import { type NextRequest, NextResponse } from "next/server"
+import { getAllBookings, getFlights } from "@/lib/firestore"
+import { NextResponse } from "next/server"
+import type { Booking, Flight } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    console.log("[v0] Admin bookings API called")
-    console.log("[v0] Firebase config check:", {
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ? "✓" : "✗",
-      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? "✓" : "✗",
+    console.log("[Analytics] Fetching analytics data...")
+
+    // Fetch all bookings and flights
+    const [bookings, flights] = await Promise.all([
+      getAllBookings(),
+      getFlights()
+    ])
+
+    console.log("[Analytics] Fetched:", { 
+      bookings: bookings.length, 
+      flights: flights.length 
     })
 
-    const searchParams = request.nextUrl.searchParams
-    const id = searchParams.get("id")
+    // Calculate total passengers
+    const totalPassengers = bookings.reduce((sum, booking) => {
+      return sum + (booking.passengers?.length || 0)
+    }, 0)
 
-    if (id) {
-      const booking = await getBookingById(id)
-      if (!booking) {
-        return NextResponse.json({ error: "Booking not found" }, { status: 404 })
-      }
-      return NextResponse.json(booking)
+    // Calculate total revenue (only confirmed/completed bookings)
+    const totalRevenue = bookings
+      .filter(b => b.status === "confirmed" || b.status === "completed")
+      .reduce((sum, booking) => sum + (booking.totalPrice || 0), 0)
+
+    // Calculate total booked seats across all flights
+    const totalBooked = flights.reduce((sum, flight) => sum + (flight.booked || 0), 0)
+
+    // Generate monthly data for the last 6 months
+    const monthlyData = generateMonthlyData(bookings)
+    
+    // Generate revenue distribution
+    const revenueDistribution = generateRevenueDistribution(bookings)
+
+    const analytics = {
+      totalFlights: flights.length,
+      totalPassengers,
+      totalRevenue,
+      totalBookings: bookings.length,
+      monthlyData,
+      revenueDistribution,
     }
 
-    const bookings = await getAllBookings()
-    console.log("[v0] Fetched bookings:", bookings.length)
+    console.log("[Analytics] Calculated analytics:", analytics)
 
-    // Enrich bookings with flight information
-    const enrichedBookings = await Promise.all(
-      bookings.map(async (booking) => {
-        try {
-          const flight = await getFlightById(booking.flightId)
-          return {
-            ...booking,
-            flight: flight
-              ? {
-                  flightNumber: flight.flightNumber,
-                  from: flight.from,
-                  to: flight.to,
-                  date: flight.date,
-                  departure: flight.departure,
-                  arrival: flight.arrival,
-                }
-              : null,
-          }
-        } catch (err) {
-          console.error("[v0] Error enriching booking:", err)
-          return booking
-        }
-      }),
-    )
-
-    console.log("[v0] Enriched bookings:", enrichedBookings.length)
-    return NextResponse.json(enrichedBookings)
+    return NextResponse.json(analytics)
   } catch (error) {
-    console.error("[v0] Error fetching bookings:", error)
+    console.error("[Analytics] Error calculating analytics:", error)
     return NextResponse.json(
       {
-        error: "Failed to fetch bookings",
+        error: "Failed to calculate analytics",
         details: error instanceof Error ? error.message : String(error),
-        timestamp: new Date().toISOString(),
       },
-      { status: 500 },
+      { status: 500 }
     )
   }
 }
 
-export async function PUT(request: NextRequest) {
-  try {
-    const searchParams = request.nextUrl.searchParams
-    const id = searchParams.get("id")
+function generateMonthlyData(bookings: Booking[]) {
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+  const now = new Date()
+  const monthlyStats: Record<string, { bookings: number; revenue: number }> = {}
 
-    if (!id) {
-      return NextResponse.json({ error: "Booking ID is required" }, { status: 400 })
-    }
-
-    const body = await request.json()
-
-    const updates = {
-      ...(body.status && { status: body.status }),
-      ...(body.passengers && { passengers: body.passengers }),
-      ...(body.totalPrice !== undefined && { totalPrice: body.totalPrice }),
-    }
-
-    await updateBooking(id, updates)
-    return NextResponse.json({ success: true, id })
-  } catch (error) {
-    console.error("Error updating booking:", error)
-    return NextResponse.json({ error: "Failed to update booking" }, { status: 500 })
+  // Initialize last 6 months
+  for (let i = 5; i >= 0; i--) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const monthKey = `${monthNames[date.getMonth()]} ${date.getFullYear()}`
+    monthlyStats[monthKey] = { bookings: 0, revenue: 0 }
   }
+
+  // Aggregate bookings by month
+  bookings.forEach((booking) => {
+    const bookingDate = booking.createdAt instanceof Date 
+      ? booking.createdAt 
+      : new Date(booking.createdAt)
+    
+    const monthKey = `${monthNames[bookingDate.getMonth()]} ${bookingDate.getFullYear()}`
+    
+    if (monthlyStats[monthKey]) {
+      monthlyStats[monthKey].bookings += 1
+      if (booking.status === "confirmed" || booking.status === "completed") {
+        monthlyStats[monthKey].revenue += booking.totalPrice || 0
+      }
+    }
+  })
+
+  // Convert to array format for charts
+  return Object.entries(monthlyStats).map(([month, stats]) => ({
+    month,
+    bookings: stats.bookings,
+    revenue: stats.revenue,
+  }))
 }
 
-export async function DELETE(request: NextRequest) {
-  try {
-    const searchParams = request.nextUrl.searchParams
-    const id = searchParams.get("id")
+function generateRevenueDistribution(bookings: Booking[]) {
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+  const now = new Date()
+  const revenueByMonth: Record<string, number> = {}
 
-    if (!id) {
-      return NextResponse.json({ error: "Booking ID is required" }, { status: 400 })
-    }
-
-    await deleteBooking(id)
-    return NextResponse.json({ success: true, id })
-  } catch (error) {
-    console.error("Error deleting booking:", error)
-    return NextResponse.json({ error: "Failed to delete booking" }, { status: 500 })
+  // Initialize last 4 months for pie chart
+  for (let i = 3; i >= 0; i--) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const monthKey = `${monthNames[date.getMonth()]}`
+    revenueByMonth[monthKey] = 0
   }
+
+  // Aggregate revenue by month (only confirmed/completed)
+  bookings
+    .filter(b => b.status === "confirmed" || b.status === "completed")
+    .forEach((booking) => {
+      const bookingDate = booking.createdAt instanceof Date 
+        ? booking.createdAt 
+        : new Date(booking.createdAt)
+      
+      const monthKey = `${monthNames[bookingDate.getMonth()]}`
+      
+      if (revenueByMonth[monthKey] !== undefined) {
+        revenueByMonth[monthKey] += booking.totalPrice || 0
+      }
+    })
+
+  // Convert to array format for pie chart
+  return Object.entries(revenueByMonth)
+    .map(([month, revenue]) => ({
+      month,
+      revenue,
+    }))
+    .filter(item => item.revenue > 0) // Only show months with revenue
 }
