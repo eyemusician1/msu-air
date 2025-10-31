@@ -268,13 +268,13 @@ export default function BookingConfirmationPage() {
           </div>
         </div>
 
-        {/* Back to Dashboard - Hide when printing */}
+        {/* Back to Bookings - Hide when printing */}
         <div className="mt-8 text-center print:hidden">
           <a
-            href="/dashboard"
+            href="/bookings"
             className="inline-block px-8 py-3 bg-white text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition border border-gray-200 shadow-sm"
           >
-            Go to Dashboard
+            View Booked Flights
           </a>
         </div>
       </div>

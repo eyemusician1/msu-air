@@ -151,7 +151,7 @@ export function LoginForm() {
             <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
               <Plane className="text-white" size={24} />
             </div>
-            <span className="font-bold text-2xl text-white">SkyWings</span>
+            <span className="font-bold text-2xl text-white">Skyrithm</span>
           </div>
 
           <h1 className="text-2xl font-bold text-white text-center mb-2">
