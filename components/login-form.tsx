@@ -177,7 +177,7 @@ export function LoginForm() {
                   name="name"
                   value={formData.name}
                   onChange={handleInputChange}
-                  placeholder="John Doe"
+                  placeholder="Your Name"
                   className={`w-full px-4 py-3 bg-slate-700 border rounded-lg focus:outline-none focus:ring-2 transition text-white placeholder-slate-400 ${
                     errors.name ? "border-red-500 focus:ring-red-500" : "border-slate-600 focus:ring-teal-500"
                   }`}

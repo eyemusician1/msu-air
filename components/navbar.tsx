@@ -48,9 +48,12 @@ export function Navbar() {
 
             {user ? (
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center">
+                <Link
+                  href="/profile"
+                  className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center hover:shadow-lg hover:shadow-emerald-500/30 transition"
+                >
                   <span className="text-slate-900 font-bold text-sm">{getUserInitials()}</span>
-                </div>
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="px-4 py-2 bg-slate-800 text-slate-300 hover:text-emerald-400 rounded-lg hover:bg-slate-700 transition font-semibold flex items-center gap-2"
@@ -97,12 +100,16 @@ export function Navbar() {
 
             {user ? (
               <div className="space-y-2">
-                <div className="px-4 py-2 flex items-center gap-3">
+                <Link
+                  href="/profile"
+                  className="px-4 py-2 flex items-center gap-3 text-slate-300 hover:bg-slate-800 hover:text-emerald-400 rounded transition"
+                >
                   <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center">
                     <span className="text-slate-900 font-bold text-sm">{getUserInitials()}</span>
                   </div>
-                  <span className="text-slate-300">{user.email}</span>
-                </div>
+                  <span>Profile</span>
+                </Link>
+                <div className="px-4 py-2 text-slate-400 text-sm">{user.email}</div>
                 <button
                   onClick={handleLogout}
                   className="w-full px-4 py-2 bg-slate-800 text-slate-300 hover:text-emerald-400 rounded font-semibold flex items-center justify-center gap-2"
