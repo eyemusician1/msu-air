@@ -4,10 +4,12 @@ import Link from "next/link"
 import { Menu, X, LogOut } from "lucide-react"
 import { useState } from "react"
 import { useAuth } from "@/contexts/auth-context"
+import Image from "next/image"
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
   const { user, logout } = useAuth()
+  const [imageError, setImageError] = useState(false)
 
   const getUserInitials = () => {
     if (user?.displayName) {
@@ -24,14 +26,42 @@ export function Navbar() {
     await logout()
   }
 
+  const UserAvatar = ({ size = "default" }: { size?: "default" | "large" }) => {
+    const sizeClasses = size === "large" ? "w-10 h-10" : "w-10 h-10"
+    const textSize = size === "large" ? "text-sm" : "text-sm"
+
+    // If user has a photoURL and no error occurred, show the image
+    if (user?.photoURL && !imageError) {
+      return (
+        <div className={`${sizeClasses} rounded-full overflow-hidden bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center`}>
+          <img
+            src={user.photoURL}
+            alt={user.displayName || "User"}
+            className="w-full h-full object-cover"
+            onError={() => setImageError(true)}
+          />
+        </div>
+      )
+    }
+
+    // Fallback to initials
+    return (
+      <div className={`${sizeClasses} bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center`}>
+        <span className={`text-slate-900 font-bold ${textSize}`}>{getUserInitials()}</span>
+      </div>
+    )
+  }
+
   return (
     <nav className="sticky top-0 z-50 bg-slate-900/95 backdrop-blur-md border-b border-emerald-500/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-lg flex items-center justify-center">
-              <span className="text-slate-900 font-bold text-lg">✈</span>
-            </div>
+            <img 
+              src="/plane-icon.png" 
+              alt="Skyrithm Logo" 
+              className="w-8 h-8"
+            />
             <span className="font-bold text-xl text-white">Skyrithm</span>
           </Link>
 
@@ -50,9 +80,9 @@ export function Navbar() {
               <div className="flex items-center gap-4">
                 <Link
                   href="/profile"
-                  className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center hover:shadow-lg hover:shadow-emerald-500/30 transition"
+                  className="hover:shadow-lg hover:shadow-emerald-500/30 transition rounded-full"
                 >
-                  <span className="text-slate-900 font-bold text-sm">{getUserInitials()}</span>
+                  <UserAvatar />
                 </Link>
                 <button
                   onClick={handleLogout}
@@ -104,9 +134,7 @@ export function Navbar() {
                   href="/profile"
                   className="px-4 py-2 flex items-center gap-3 text-slate-300 hover:bg-slate-800 hover:text-emerald-400 rounded transition"
                 >
-                  <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center">
-                    <span className="text-slate-900 font-bold text-sm">{getUserInitials()}</span>
-                  </div>
+                  <UserAvatar size="large" />
                   <span>Profile</span>
                 </Link>
                 <div className="px-4 py-2 text-slate-400 text-sm">{user.email}</div>

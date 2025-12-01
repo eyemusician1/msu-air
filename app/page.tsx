@@ -1,48 +1,57 @@
-"use client";
+"use client"
 
-import { useAuth } from '@/contexts/auth-context';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { Navbar } from "@/components/navbar";
-import { HeroSection } from "@/components/hero-section";
-import { FlightSearch } from "@/components/flight-search";
-import { Footer } from "@/components/footer";
+import { useAuth } from '@/contexts/auth-context'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+import { Navbar } from "@/components/navbar"
+import { HeroSection } from "@/components/hero-section"
+import { FlightSearch } from "@/components/flight-search"
+import { Footer } from "@/components/footer"
+import { VideoAdBanner } from "@/components/video-ad"
 
 export default function Home() {
-  const { user, loading } = useAuth();
-  const router = useRouter();
+  const { user, loading } = useAuth()
+  const router = useRouter()
 
   useEffect(() => {
-    // Only redirect to login if user is NOT logged in
     if (!loading && !user) {
-      router.replace('/login');
+      router.replace('/login')
     }
-  }, [user, loading, router]);
+  }, [user, loading, router])
 
-  // Show loading state while checking authentication
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto"></div>
-          <p className="mt-4 text-slate-300">Loading...</p>
-        </div>
+        <div className="text-white text-xl">Loading...</div>
       </div>
-    );
+    )
   }
 
-  // If not authenticated, don't show anything while redirecting
   if (!user) {
-    return null;
+    return null
   }
 
-  // User is authenticated, show the homepage
   return (
-    <main className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <Navbar />
+      
+      {/* Video Ad Banner - Logo emphasized */}
+      <div className="container mx-auto px-4 pt-6">
+        <VideoAdBanner 
+          link="https://msu-air.vercel.app/login"
+          className="mb-6"
+        />
+      </div>
+      
+      {/* Hero Section */}
       <HeroSection />
-      <FlightSearch />
+      
+      {/* Flight Search Form */}
+      <div className="container mx-auto px-4 py-8">
+        <FlightSearch />
+      </div>
+      
       <Footer />
-    </main>
-  );
+    </div>
+  )
 }

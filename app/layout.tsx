@@ -8,9 +8,12 @@ import { AuthProvider } from "@/contexts/auth-context"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "MSU Air - Airline Reservation System",
+  title: "SkyRithm",
   description: "Modern airline reservation and ticketing system",
   generator: "v0.app",
+  icons: {
+    icon: "/favicon.ico",
+  }
 }
 
 export default function RootLayout({

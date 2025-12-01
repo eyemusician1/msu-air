@@ -118,7 +118,7 @@ export function LoginForm() {
       // Small delay to ensure Firebase auth state is updated
       setTimeout(() => {
         window.location.href = '/'
-      }, 500)
+      }, 500) 
     } catch (error: any) {
       console.error('Google sign-in error:', error)
       setAuthError(getFirebaseErrorMessage(error))
