@@ -3,6 +3,12 @@
 import { useEffect, useRef } from "react"
 import { Plane, MapPin, Clock, Shield, Award, TrendingDown, ArrowRight, Sparkles } from "lucide-react"
 import gsap from "gsap"
+import { ScrollTrigger } from "gsap/ScrollTrigger"
+
+// Register ScrollTrigger plugin
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger)
+}
 
 export function HeroSection() {
   const heroRef = useRef<HTMLDivElement>(null)
@@ -11,9 +17,11 @@ export function HeroSection() {
   const ctaRef = useRef<HTMLDivElement>(null)
   const cardsRef = useRef<HTMLDivElement>(null)
   const statsRef = useRef<HTMLDivElement>(null)
+  const bottomCtaRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const ctx = gsap.context(() => {
+      // Initial load animations (existing)
       const tl = gsap.timeline({ defaults: { ease: "power3.out" } })
 
       tl.from(titleRef.current, {
@@ -31,18 +39,73 @@ export function HeroSection() {
           y: 20,
           duration: 0.6,
         }, "-=0.4")
-        .from(statsRef.current?.children || [], {
+
+      // Stats scroll animation
+      if (statsRef.current) {
+        gsap.from(statsRef.current.children, {
+          scrollTrigger: {
+            trigger: statsRef.current,
+            start: "top 80%",
+            end: "bottom 20%",
+            toggleActions: "play none none reverse",
+          },
           opacity: 0,
-          y: 30,
-          duration: 0.6,
+          y: 50,
+          scale: 0.8,
+          duration: 0.8,
           stagger: 0.1,
-        }, "-=0.4")
-        .from(cardsRef.current?.children || [], {
+          ease: "back.out(1.7)",
+        })
+      }
+
+      // Feature cards scroll animation
+      if (cardsRef.current) {
+        gsap.from(cardsRef.current.children, {
+          scrollTrigger: {
+            trigger: cardsRef.current,
+            start: "top 80%",
+            end: "bottom 20%",
+            toggleActions: "play none none reverse",
+          },
           opacity: 0,
-          y: 40,
+          y: 60,
+          rotation: -5,
+          scale: 0.9,
           duration: 0.8,
           stagger: 0.15,
-        }, "-=0.5")
+          ease: "power3.out",
+        })
+      }
+
+      // Bottom CTA scroll animation with fade and slide up
+      if (bottomCtaRef.current) {
+        gsap.from(bottomCtaRef.current, {
+          scrollTrigger: {
+            trigger: bottomCtaRef.current,
+            start: "top 85%",
+            toggleActions: "play none none reverse",
+          },
+          opacity: 0,
+          y: 80,
+          scale: 0.95,
+          duration: 1,
+          ease: "power3.out",
+        })
+      }
+
+      // Parallax effect on background blobs
+      gsap.utils.toArray(".parallax-blob").forEach((blob: any) => {
+        gsap.to(blob, {
+          scrollTrigger: {
+            trigger: heroRef.current,
+            start: "top top",
+            end: "bottom top",
+            scrub: 1,
+          },
+          y: (i) => i * 50 + 100,
+          ease: "none",
+        })
+      })
     }, heroRef)
 
     return () => ctx.revert()
@@ -94,11 +157,11 @@ export function HeroSection() {
       ref={heroRef}
       className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 overflow-hidden py-12"
     >
-      {/* Animated Background Elements */}
+      {/* Animated Background Elements with Parallax */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="parallax-blob absolute top-20 left-10 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="parallax-blob absolute bottom-20 right-10 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="parallax-blob absolute top-1/2 left-1/2 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -197,7 +260,7 @@ export function HeroSection() {
         </div>
 
         {/* Bottom CTA Section */}
-        <div className="text-center">
+        <div ref={bottomCtaRef} className="text-center">
           <div className="inline-block bg-gradient-to-r from-slate-800/50 to-slate-800/30 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 max-w-2xl">
             <h2 className="text-2xl font-bold text-white mb-3">Ready to Take Off?</h2>
             <p className="text-slate-400 mb-6">

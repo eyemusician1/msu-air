@@ -8,6 +8,7 @@ import {
   Users, 
   TrendingUp, 
   DollarSign,
+  PhilippinePeso,
   Search,
   Filter,
   Edit2,
@@ -296,7 +297,7 @@ export function AdminPanel() {
                 color="from-purple-500/10 to-pink-500/10"
               />
               <StatCard
-                icon={DollarSign}
+                icon={PhilippinePeso}
                 label="Total Revenue"
                 value={`₱${(analyticsData?.totalRevenue || 0).toLocaleString()}`}
                 change={15}
