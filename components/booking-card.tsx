@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { Calendar, MapPin, Users, Ticket, Clock, AlertCircle } from "lucide-react"
+import { useState, useRef, useEffect } from "react"
+import { Calendar, MapPin, Users, Ticket, Clock, AlertCircle, ChevronDown, Plane } from "lucide-react"
 import type { Booking, Flight } from "@/lib/types"
+import gsap from "gsap"
 
 interface BookingCardProps {
   booking: Booking & { flight?: Flight }
@@ -10,7 +11,31 @@ interface BookingCardProps {
 
 export function BookingCard({ booking }: BookingCardProps) {
   const [showDetails, setShowDetails] = useState(false)
+  const detailsRef = useRef<HTMLDivElement>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
+
   const flight = booking.flight
+
+  // Expand/collapse animation
+  useEffect(() => {
+    if (detailsRef.current) {
+      if (showDetails) {
+        gsap.to(detailsRef.current, {
+          height: "auto",
+          opacity: 1,
+          duration: 0.3,
+          ease: "power2.out",
+        })
+      } else {
+        gsap.to(detailsRef.current, {
+          height: 0,
+          opacity: 0,
+          duration: 0.3,
+          ease: "power2.in",
+        })
+      }
+    }
+  }, [showDetails])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -55,108 +80,153 @@ export function BookingCard({ booking }: BookingCardProps) {
     return time
   }
 
+  if (!flight) {
+    return (
+      <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6 shadow-xl">
+        <div className="flex items-center gap-3 text-slate-400">
+          <AlertCircle className="w-5 h-5" />
+          <p>Flight details unavailable</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg overflow-hidden hover:border-emerald-500/30 transition">
-      {/* Card Header */}
-      <div className="bg-gradient-to-r from-slate-800 to-slate-700/50 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex-1">
-            {flight ? (
-              <div>
-                <h3 className="text-lg font-semibold text-white">
-                  {flight.from} → {flight.to}
-                </h3>
-                <p className="text-sm text-slate-400">
-                  {flight.airline} • Flight {flight.flightNumber}
-                </p>
-              </div>
-            ) : (
-              <div>
-                <h3 className="text-lg font-semibold text-white">Flight {booking.flightId}</h3>
-                <p className="text-sm text-slate-400">Flight details unavailable</p>
-              </div>
-            )}
+    <div
+      ref={cardRef}
+      className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl hover:border-slate-600/50 transition-all duration-300"
+    >
+      {/* Main Card Content */}
+      <div className="p-6">
+        {/* Header with Status */}
+        <div className="flex items-start justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-emerald-500/20 rounded-xl flex items-center justify-center">
+              <Plane className="w-6 h-6 text-emerald-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white">
+                {flight.airline} • Flight {flight.flightNumber}
+              </h3>
+              <p className="text-sm text-slate-400">{booking.bookingRef}</p>
+            </div>
+          </div>
+          <span
+            className={`px-4 py-1.5 rounded-full text-sm font-semibold border ${getStatusColor(
+              booking.status
+            )}`}
+          >
+            {getStatusIcon(booking.status)} {booking.status.toUpperCase()}
+          </span>
+        </div>
+
+        {/* Flight Route */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <MapPin className="w-4 h-4 text-emerald-400" />
+              <span className="text-xs text-slate-400">Departure</span>
+            </div>
+            <p className="text-lg font-bold text-white">{flight.from}</p>
+            <p className="text-sm text-slate-400">{formatDate(flight.date)}</p>
+            <p className="text-sm text-slate-400">{formatTime(flight.departure)}</p>
+          </div>
+
+          <div className="flex flex-col items-center justify-center">
+            <Clock className="w-4 h-4 text-slate-500 mb-1" />
+            <div className="w-full h-0.5 bg-gradient-to-r from-emerald-500/50 via-slate-600 to-emerald-500/50 rounded-full relative">
+              <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-4 h-4 bg-emerald-500 rounded-full" />
+            </div>
+            <p className="text-xs text-slate-500 mt-2">{flight.duration}</p>
+          </div>
+
+          <div className="text-right">
+            <div className="flex items-center justify-end gap-2 mb-2">
+              <span className="text-xs text-slate-400">Arrival</span>
+              <MapPin className="w-4 h-4 text-blue-400" />
+            </div>
+            <p className="text-lg font-bold text-white">{flight.to}</p>
+            <p className="text-sm text-slate-400">{formatDate(flight.date)}</p>
+            <p className="text-sm text-slate-400">{formatTime(flight.arrival)}</p>
           </div>
         </div>
 
-        <div
-          className={`px-4 py-2 rounded-full border text-sm font-semibold flex items-center gap-2 ${getStatusColor(
-            booking.status,
-          )}`}
-        >
-          <span>{getStatusIcon(booking.status)}</span>
-          <span className="capitalize">{booking.status}</span>
+        {/* Bottom Info Row */}
+        <div className="flex items-center justify-between pt-4 border-t border-slate-700/50">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <Ticket className="w-4 h-4 text-slate-400" />
+              <div>
+                <p className="text-xs text-slate-500">Price</p>
+                <p className="text-sm font-semibold text-white">₱{booking.totalPrice.toFixed(2)}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-slate-400" />
+              <div>
+                <p className="text-xs text-slate-500">Passengers</p>
+                <p className="text-sm font-semibold text-white">{booking.passengers.length}</p>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700/50 hover:bg-slate-700 text-slate-300 rounded-lg transition-all duration-200"
+          >
+            <span className="text-sm font-medium">
+              {showDetails ? "Hide Details" : "View Details"}
+            </span>
+            <ChevronDown
+              className={`w-4 h-4 transition-transform duration-300 ${
+                showDetails ? "rotate-180" : ""
+              }`}
+            />
+          </button>
         </div>
       </div>
 
-      {/* Card Body */}
-      <div className="px-6 py-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          {/* Flight Details */}
-          {flight && (
-            <>
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <Calendar className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+      {/* Expandable Details Section */}
+      <div ref={detailsRef} className="h-0 opacity-0 overflow-hidden">
+        <div className="px-6 pb-6 pt-2 border-t border-slate-700/50 bg-slate-900/30">
+          {/* Passengers */}
+          <div className="mb-4">
+            <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Passenger Details
+            </h4>
+            <div className="space-y-3">
+              {booking.passengers.map((passenger, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg"
+                >
                   <div>
-                    <p className="text-xs text-slate-400 uppercase tracking-wide">Departure</p>
-                    <p className="text-white font-semibold">{formatDate(flight.date)}</p>
-                    <p className="text-sm text-slate-300">{formatTime(flight.departure)}</p>
+                    <p className="text-sm font-semibold text-white">{passenger.name}</p>
+                    <p className="text-xs text-slate-400">{passenger.email}</p>
+                    {passenger.phone && (
+                      <p className="text-xs text-slate-500">{passenger.phone}</p>
+                    )}
                   </div>
+                  {passenger.seatAssignment && (
+                    <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-lg text-sm font-semibold">
+                      Seat {passenger.seatAssignment}
+                    </span>
+                  )}
                 </div>
-
-                <div className="flex items-start gap-3">
-                  <Clock className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-slate-400 uppercase tracking-wide">Duration</p>
-                    <p className="text-white font-semibold">{flight.duration}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <MapPin className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-slate-400 uppercase tracking-wide">Arrival</p>
-                    <p className="text-white font-semibold">{formatTime(flight.arrival)}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Ticket className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-slate-400 uppercase tracking-wide">Price</p>
-                    <p className="text-white font-semibold">₱{booking.totalPrice.toFixed(2)}</p>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Booking Reference and Passengers */}
-        <div className="border-t border-slate-700/50 pt-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Booking Reference</p>
-              <p className="text-lg font-mono font-semibold text-emerald-400">{booking.bookingRef}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-slate-400 uppercase tracking-wide mb-1">Passengers</p>
-              <p className="text-lg font-semibold text-white">{booking.passengers.length}</p>
+              ))}
             </div>
           </div>
 
           {/* Seats */}
-          {booking.selectedSeats.length > 0 && (
-            <div>
-              <p className="text-xs text-slate-400 uppercase tracking-wide mb-2">Seats</p>
+          {booking.selectedSeats && booking.selectedSeats.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-slate-300 mb-2">Seat Assignments</h4>
               <div className="flex flex-wrap gap-2">
                 {booking.selectedSeats.map((seat) => (
                   <span
                     key={seat}
-                    className="px-3 py-1 bg-emerald-500/20 text-emerald-300 rounded text-sm font-medium border border-emerald-500/30"
+                    className="px-3 py-1 bg-slate-700/50 text-slate-300 rounded-lg text-sm font-medium"
                   >
                     {seat}
                   </span>
@@ -164,57 +234,21 @@ export function BookingCard({ booking }: BookingCardProps) {
               </div>
             </div>
           )}
-        </div>
-      </div>
 
-      {/* Card Footer */}
-      <div className="bg-slate-900/50 px-6 py-4 flex items-center justify-between border-t border-slate-700/50">
-        <button
-          onClick={() => setShowDetails(!showDetails)}
-          className="text-emerald-400 hover:text-emerald-300 transition font-semibold text-sm"
-        >
-          {showDetails ? "Hide Details" : "View Details"}
-        </button>
-
-        {booking.status === "confirmed" && (
-          <button className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded transition font-semibold text-sm">
-            Manage Booking
-          </button>
-        )}
-      </div>
-
-      {/* Expanded Details */}
-      {showDetails && (
-        <div className="bg-slate-900/30 px-6 py-6 border-t border-slate-700/50">
-          <div className="space-y-4">
-            <div>
-              <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                <Users className="w-4 h-4 text-emerald-400" />
-                Passengers
-              </h4>
-              <div className="space-y-2">
-                {booking.passengers.map((passenger, idx) => (
-                  <div key={idx} className="bg-slate-800/50 rounded p-3 border border-slate-700/30">
-                    <p className="text-white font-medium">{passenger.name}</p>
-                    <p className="text-sm text-slate-400">{passenger.email}</p>
-                    {passenger.phone && <p className="text-sm text-slate-400">{passenger.phone}</p>}
-                  </div>
-                ))}
+          {/* Cancelled Notice */}
+          {booking.status === "cancelled" && (
+            <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-red-400">This booking has been cancelled</p>
+                <p className="text-xs text-red-300 mt-1">
+                  Please contact support for refund information
+                </p>
               </div>
             </div>
-
-            {booking.status === "cancelled" && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded p-4 flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-red-400 font-semibold text-sm">This booking has been cancelled</p>
-                  <p className="text-red-300/70 text-sm mt-1">Please contact support for refund information</p>
-                </div>
-              </div>
-            )}
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

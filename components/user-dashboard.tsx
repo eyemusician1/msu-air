@@ -17,7 +17,7 @@ export function UserDashboard() {
   const [profile, setProfile] = useState({
     name: user?.displayName || "User",
     email: user?.email || "",
-    phone: "+1 (555) 123-4567",
+    phone: "+63 9123-4567",
     passport: "AB123456",
   })
 
@@ -26,7 +26,7 @@ export function UserDashboard() {
       setProfile({
         name: user.displayName || "User",
         email: user.email || "",
-        phone: "+1 (555) 123-4567",
+        phone: "+63 9123-4567",
         passport: "AB123456",
       })
     }

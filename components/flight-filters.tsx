@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Filter, X, ChevronDown } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Filter, X, ChevronDown, RotateCcw } from "lucide-react"
 import type { Flight } from "@/lib/types"
 
 interface FlightFiltersProps {
@@ -12,7 +12,7 @@ interface FlightFiltersProps {
 }
 
 export function FlightFilters({ flights, onFiltersChange, isOpen = true, onClose }: FlightFiltersProps) {
-  const [priceRange, setPriceRange] = useState([0, 15000])
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 15000])
   const [selectedAirlines, setSelectedAirlines] = useState<string[]>([])
   const [selectedStops, setSelectedStops] = useState<string[]>(["Non-stop", "1 Stop"])
   const [selectedTimes, setSelectedTimes] = useState<string[]>(["Morning", "Afternoon", "Evening"])
@@ -27,6 +27,10 @@ export function FlightFilters({ flights, onFiltersChange, isOpen = true, onClose
   })
 
   const airlines = Array.from(new Set(flights.map((f) => f.airline)))
+
+  useEffect(() => {
+    applyFilters()
+  }, [priceRange, selectedAirlines, selectedStops, selectedTimes, selectedDuration, sortBy, flights])
 
   const applyFilters = () => {
     const filtered = flights.filter((flight) => {
@@ -76,40 +80,28 @@ export function FlightFilters({ flights, onFiltersChange, isOpen = true, onClose
     onFiltersChange(filtered)
   }
 
-  const handleFilterChange = (callback: () => void) => {
-    callback()
-    setTimeout(applyFilters, 0)
-  }
-
   const toggleAirline = (airline: string) => {
-    handleFilterChange(() => {
-      setSelectedAirlines((prev) => (prev.includes(airline) ? prev.filter((a) => a !== airline) : [...prev, airline]))
-    })
+    setSelectedAirlines((prev) =>
+      prev.includes(airline) ? prev.filter((a) => a !== airline) : [...prev, airline]
+    )
   }
 
   const toggleStop = (stop: string) => {
-    handleFilterChange(() => {
-      setSelectedStops((prev) => (prev.includes(stop) ? prev.filter((s) => s !== stop) : [...prev, stop]))
-    })
+    setSelectedStops((prev) =>
+      prev.includes(stop) ? prev.filter((s) => s !== stop) : [...prev, stop]
+    )
   }
 
   const toggleTime = (time: string) => {
-    handleFilterChange(() => {
-      setSelectedTimes((prev) => (prev.includes(time) ? prev.filter((t) => t !== time) : [...prev, time]))
-    })
+    setSelectedTimes((prev) =>
+      prev.includes(time) ? prev.filter((t) => t !== time) : [...prev, time]
+    )
   }
 
   const toggleDuration = (duration: string) => {
-    handleFilterChange(() => {
-      setSelectedDuration((prev) =>
-        prev.includes(duration) ? prev.filter((d) => d !== duration) : [...prev, duration],
-      )
-    })
-  }
-
-  const handlePriceChange = (newRange: [number, number]) => {
-    setPriceRange(newRange)
-    handleFilterChange(() => {})
+    setSelectedDuration((prev) =>
+      prev.includes(duration) ? prev.filter((d) => d !== duration) : [...prev, duration]
+    )
   }
 
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -126,185 +118,179 @@ export function FlightFilters({ flights, onFiltersChange, isOpen = true, onClose
     setSelectedTimes(["Morning", "Afternoon", "Evening"])
     setSelectedDuration([])
     setSortBy("price-low")
-    setTimeout(applyFilters, 0)
   }
 
   if (!isOpen) return null
 
   return (
-    <div className="bg-slate-800 rounded-lg p-6 shadow-lg border border-emerald-500/20 sticky top-20">
+    <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6 shadow-xl sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
-          <Filter size={20} className="text-emerald-400" />
-          <h3 className="font-semibold text-white">Filters & Sort</h3>
+          <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
+            <Filter className="w-5 h-5 text-emerald-400" />
+          </div>
+          <h3 className="text-xl font-bold text-white">Filters</h3>
         </div>
         {onClose && (
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition lg:hidden">
-            <X size={20} />
+          <button
+            onClick={onClose}
+            className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition"
+          >
+            <X className="w-5 h-5" />
           </button>
         )}
       </div>
 
-      <div className="space-y-4 mb-6">
-        <div className="bg-slate-700/50 rounded-lg p-4 border border-slate-600/50">
-          <label className="text-sm font-semibold text-slate-200 block mb-3">Sort By</label>
-          <select
-            value={sortBy}
-            onChange={(e) => {
-              setSortBy(e.target.value as typeof sortBy)
-              handleFilterChange(() => {})
-            }}
-            className="w-full bg-slate-600 text-white border border-slate-500 rounded px-3 py-2 text-sm"
-          >
-            <option value="price-low">Price: Low to High</option>
-            <option value="price-high">Price: High to Low</option>
-            <option value="duration">Duration: Shortest First</option>
-            <option value="departure">Departure Time</option>
-          </select>
-        </div>
+      {/* Sort By */}
+      <div className="mb-6">
+        <label className="text-sm font-semibold text-slate-300 mb-2 block">Sort By</label>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+          className="w-full bg-slate-700/50 text-white border border-slate-600 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition"
+        >
+          <option value="price-low">Price: Low to High</option>
+          <option value="price-high">Price: High to Low</option>
+          <option value="duration">Duration: Shortest First</option>
+          <option value="departure">Departure Time</option>
+        </select>
+      </div>
 
+      <div className="space-y-4">
+        {/* Price Range */}
         <div>
           <button
             onClick={() => toggleSection("price")}
-            className="w-full flex items-center justify-between p-3 bg-slate-700/50 hover:bg-slate-700 rounded-lg border border-slate-600/50 transition"
+            className="w-full flex items-center justify-between p-3 bg-slate-700/30 hover:bg-slate-700/50 rounded-xl border border-slate-600/30 transition"
           >
-            <span className="text-sm font-semibold text-slate-200">Price Range</span>
-            <ChevronDown
-              size={18}
-              className={`text-slate-400 transition ${expandedSections.price ? "rotate-180" : ""}`}
-            />
+            <span className="font-semibold text-slate-200">Price Range</span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${expandedSections.price ? "rotate-180" : ""}`} />
           </button>
           {expandedSections.price && (
-            <div className="mt-3 p-4 bg-slate-700/30 rounded-lg space-y-3">
+            <div className="mt-3 px-3">
               <input
                 type="range"
                 min="0"
                 max="15000"
                 value={priceRange[1]}
-                onChange={(e) => handlePriceChange([priceRange[0], Number(e.target.value)])}
-                className="w-full accent-emerald-500"
+                onChange={(e) => setPriceRange([priceRange[0], Number(e.target.value)])}
+                className="w-full accent-emerald-500 mb-2"
               />
-              <p className="text-sm text-emerald-400 font-semibold">
-                ₱{priceRange[0].toLocaleString()} - ₱{priceRange[1].toLocaleString()}
-              </p>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400">₱{priceRange[0].toLocaleString()}</span>
+                <span className="text-emerald-400 font-semibold">₱{priceRange[1].toLocaleString()}</span>
+              </div>
             </div>
           )}
         </div>
 
+        {/* Airlines */}
         <div>
           <button
             onClick={() => toggleSection("airlines")}
-            className="w-full flex items-center justify-between p-3 bg-slate-700/50 hover:bg-slate-700 rounded-lg border border-slate-600/50 transition"
+            className="w-full flex items-center justify-between p-3 bg-slate-700/30 hover:bg-slate-700/50 rounded-xl border border-slate-600/30 transition"
           >
-            <span className="text-sm font-semibold text-slate-200">Airlines</span>
-            <ChevronDown
-              size={18}
-              className={`text-slate-400 transition ${expandedSections.airlines ? "rotate-180" : ""}`}
-            />
+            <span className="font-semibold text-slate-200">Airlines</span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${expandedSections.airlines ? "rotate-180" : ""}`} />
           </button>
           {expandedSections.airlines && (
-            <div className="mt-3 p-4 bg-slate-700/30 rounded-lg space-y-2">
+            <div className="mt-3 space-y-2 px-3">
               {airlines.map((airline) => (
-                <label key={airline} className="flex items-center gap-2 cursor-pointer">
+                <label key={airline} className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={selectedAirlines.includes(airline)}
                     onChange={() => toggleAirline(airline)}
-                    className="rounded accent-emerald-500"
+                    className="rounded accent-emerald-500 w-4 h-4"
                   />
-                  <span className="text-sm text-slate-300">{airline}</span>
+                  <span className="text-sm text-slate-300 group-hover:text-white transition">{airline}</span>
                 </label>
               ))}
             </div>
           )}
         </div>
 
+        {/* Stops */}
         <div>
           <button
             onClick={() => toggleSection("stops")}
-            className="w-full flex items-center justify-between p-3 bg-slate-700/50 hover:bg-slate-700 rounded-lg border border-slate-600/50 transition"
+            className="w-full flex items-center justify-between p-3 bg-slate-700/30 hover:bg-slate-700/50 rounded-xl border border-slate-600/30 transition"
           >
-            <span className="text-sm font-semibold text-slate-200">Stops</span>
-            <ChevronDown
-              size={18}
-              className={`text-slate-400 transition ${expandedSections.stops ? "rotate-180" : ""}`}
-            />
+            <span className="font-semibold text-slate-200">Stops</span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${expandedSections.stops ? "rotate-180" : ""}`} />
           </button>
           {expandedSections.stops && (
-            <div className="mt-3 p-4 bg-slate-700/30 rounded-lg space-y-2">
+            <div className="mt-3 space-y-2 px-3">
               {["Non-stop", "1 Stop", "2+ Stops"].map((stop) => (
-                <label key={stop} className="flex items-center gap-2 cursor-pointer">
+                <label key={stop} className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={selectedStops.includes(stop)}
                     onChange={() => toggleStop(stop)}
-                    className="rounded accent-emerald-500"
+                    className="rounded accent-emerald-500 w-4 h-4"
                   />
-                  <span className="text-sm text-slate-300">{stop}</span>
+                  <span className="text-sm text-slate-300 group-hover:text-white transition">{stop}</span>
                 </label>
               ))}
             </div>
           )}
         </div>
 
+        {/* Departure Time */}
         <div>
           <button
             onClick={() => toggleSection("time")}
-            className="w-full flex items-center justify-between p-3 bg-slate-700/50 hover:bg-slate-700 rounded-lg border border-slate-600/50 transition"
+            className="w-full flex items-center justify-between p-3 bg-slate-700/30 hover:bg-slate-700/50 rounded-xl border border-slate-600/30 transition"
           >
-            <span className="text-sm font-semibold text-slate-200">Departure Time</span>
-            <ChevronDown
-              size={18}
-              className={`text-slate-400 transition ${expandedSections.time ? "rotate-180" : ""}`}
-            />
+            <span className="font-semibold text-slate-200">Departure Time</span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${expandedSections.time ? "rotate-180" : ""}`} />
           </button>
           {expandedSections.time && (
-            <div className="mt-3 p-4 bg-slate-700/30 rounded-lg space-y-2">
+            <div className="mt-3 space-y-2 px-3">
               {[
                 { label: "Morning (6am - 12pm)", value: "Morning" },
                 { label: "Afternoon (12pm - 6pm)", value: "Afternoon" },
                 { label: "Evening (6pm - 12am)", value: "Evening" },
               ].map(({ label, value }) => (
-                <label key={value} className="flex items-center gap-2 cursor-pointer">
+                <label key={value} className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={selectedTimes.includes(value)}
                     onChange={() => toggleTime(value)}
-                    className="rounded accent-emerald-500"
+                    className="rounded accent-emerald-500 w-4 h-4"
                   />
-                  <span className="text-sm text-slate-300">{label}</span>
+                  <span className="text-sm text-slate-300 group-hover:text-white transition">{label}</span>
                 </label>
               ))}
             </div>
           )}
         </div>
 
+        {/* Duration */}
         <div>
           <button
             onClick={() => toggleSection("duration")}
-            className="w-full flex items-center justify-between p-3 bg-slate-700/50 hover:bg-slate-700 rounded-lg border border-slate-600/50 transition"
+            className="w-full flex items-center justify-between p-3 bg-slate-700/30 hover:bg-slate-700/50 rounded-xl border border-slate-600/30 transition"
           >
-            <span className="text-sm font-semibold text-slate-200">Flight Duration</span>
-            <ChevronDown
-              size={18}
-              className={`text-slate-400 transition ${expandedSections.duration ? "rotate-180" : ""}`}
-            />
+            <span className="font-semibold text-slate-200">Flight Duration</span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${expandedSections.duration ? "rotate-180" : ""}`} />
           </button>
           {expandedSections.duration && (
-            <div className="mt-3 p-4 bg-slate-700/30 rounded-lg space-y-2">
+            <div className="mt-3 space-y-2 px-3">
               {[
                 { label: "Up to 3 hours", value: "0-3" },
                 { label: "3 to 6 hours", value: "3-6" },
                 { label: "6+ hours", value: "6+" },
               ].map(({ label, value }) => (
-                <label key={value} className="flex items-center gap-2 cursor-pointer">
+                <label key={value} className="flex items-center gap-2 cursor-pointer group">
                   <input
                     type="checkbox"
                     checked={selectedDuration.includes(value)}
                     onChange={() => toggleDuration(value)}
-                    className="rounded accent-emerald-500"
+                    className="rounded accent-emerald-500 w-4 h-4"
                   />
-                  <span className="text-sm text-slate-300">{label}</span>
+                  <span className="text-sm text-slate-300 group-hover:text-white transition">{label}</span>
                 </label>
               ))}
             </div>
@@ -312,10 +298,12 @@ export function FlightFilters({ flights, onFiltersChange, isOpen = true, onClose
         </div>
       </div>
 
+      {/* Reset Button */}
       <button
         onClick={resetFilters}
-        className="w-full px-4 py-2 bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg border border-slate-600/50 transition font-medium text-sm"
+        className="w-full mt-6 py-3 bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
       >
+        <RotateCcw className="w-4 h-4" />
         Reset Filters
       </button>
     </div>
