@@ -345,13 +345,7 @@ export function UserDashboard() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <Plane size={20} className="text-blue-600" />
-                <div>
-                  <p className="text-sm text-gray-600">Seats</p>
-                  <p className="font-semibold text-gray-900">{selectedBooking.selectedSeats.join(", ")}</p>
-                </div>
-              </div>
+           
 
               <div className="flex items-center gap-3">
                 <User size={20} className="text-blue-600" />

@@ -58,7 +58,7 @@ export function Navbar() {
         <div className="flex justify-between items-center h-16">
           <Link href="/" className="flex items-center gap-3">
             <img 
-              src="/plane-icon.png" 
+              src="/plane.png" 
               alt="Skyrithm Logo" 
               className="w-8 h-8"
             />
