@@ -1,27 +1,55 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import {
-  BarChart,
-  Bar,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts"
-import { Plus, Edit2, Trash2, Users, Plane, DollarSign, TrendingUp, X, Search, PhilippinePeso } from "lucide-react"
-import type { Flight, Booking } from "@/lib/types"
+import { 
+  LayoutDashboard, 
+  Plane, 
+  Calendar, 
+  Users, 
+  TrendingUp, 
+  DollarSign,
+  Search,
+  Filter,
+  Edit2,
+  Trash2,
+  Plus,
+  X,
+  AlertCircle,
+  CheckCircle,
+  Activity,
+  BarChart3,
+  MapPin,
+  Clock,
+  Package,
+  Check,
+  XCircle,
+  MoreVertical
+} from "lucide-react"
 
-const COLORS = ["#10b981", "#14b8a6", "#f59e0b", "#06b6d4"]
+interface Flight {
+  id: string
+  flightNumber: string
+  airline: string
+  from: string
+  to: string
+  date: string
+  departure: string
+  arrival: string
+  duration: string
+  price: number
+  capacity: number
+  booked?: number
+}
 
-interface EnrichedBooking extends Booking {
+interface Booking {
+  id: string
+  bookingRef: string
+  userId: string
+  flightId: string
+  passengers: any[]
+  totalPrice: number
+  status: "pending" | "confirmed" | "cancelled"
+  createdAt: any
   flight?: {
     flightNumber: string
     from: string
@@ -33,65 +61,63 @@ interface EnrichedBooking extends Booking {
 }
 
 interface AnalyticsData {
+  totalFlights: number
   totalBookings: number
   totalPassengers: number
   totalRevenue: number
-  totalFlights: number
-  monthlyData: Array<{ month: string; bookings: number; revenue: number }>
-  revenueDistribution: Array<{ month: string; revenue: number }>
+  monthlyData?: any[]
+  revenueDistribution?: any[]
 }
 
 export function AdminPanel() {
-  const [activeTab, setActiveTab] = useState("overview")
-  const [showAddFlight, setShowAddFlight] = useState(false)
-  const [flightData, setFlightData] = useState<Flight[]>([])
-  const [bookingsData, setBookingsData] = useState<EnrichedBooking[]>([])
+  const [activeTab, setActiveTab] = useState<"dashboard" | "flights" | "bookings">("dashboard")
+  const [flights, setFlights] = useState<Flight[]>([])
+  const [bookings, setBookings] = useState<Booking[]>([])
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
-  const [editingFlight, setEditingFlight] = useState<Flight | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [formData, setFormData] = useState({
-    number: "",
-    from: "",
-    to: "",
-    capacity: "",
-    departure: "",
-    arrival: "",
-    duration: "",
-    price: "",
-    date: "",
-  })
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "confirmed" | "cancelled">("all")
+  const [showAddFlight, setShowAddFlight] = useState(false)
+  const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null)
 
   useEffect(() => {
     fetchData()
-    const interval = setInterval(fetchData, 30000)
-    return () => clearInterval(interval)
-  }, [])
+  }, [activeTab])
 
   const fetchData = async () => {
     setLoading(true)
     try {
-      const flightsResponse = await fetch("/api/flights")
-      if (flightsResponse.ok) {
-        const flights = await flightsResponse.json()
-        if (Array.isArray(flights)) {
-          setFlightData(flights)
+      if (activeTab === "flights" || activeTab === "dashboard") {
+        const flightsRes = await fetch("/api/flights")
+        const flightsData = await flightsRes.json()
+        setFlights(Array.isArray(flightsData) ? flightsData : [])
+      }
+
+      if (activeTab === "bookings" || activeTab === "dashboard") {
+        const bookingsRes = await fetch("/api/admin/bookings")
+        
+        if (!bookingsRes.ok) {
+          throw new Error(`Failed to fetch bookings: ${bookingsRes.status}`)
+        }
+        
+        const bookingsData = await bookingsRes.json()
+        
+        if (bookingsData.error) {
+          setBookings([])
+        } else {
+          setBookings(Array.isArray(bookingsData) ? bookingsData : [])
         }
       }
 
-      const bookingsResponse = await fetch("/api/admin/bookings")
-      if (bookingsResponse.ok) {
-        const bookings = await bookingsResponse.json()
-        if (Array.isArray(bookings)) {
-          setBookingsData(bookings)
+      if (activeTab === "dashboard") {
+        const analyticsRes = await fetch("/api/admin/analytics")
+        
+        if (!analyticsRes.ok) {
+          throw new Error(`Failed to fetch analytics: ${analyticsRes.status}`)
         }
-      }
-
-      const analyticsResponse = await fetch("/api/admin/analytics")
-      if (analyticsResponse.ok) {
-        const analytics = await analyticsResponse.json()
-        setAnalyticsData(analytics)
+        
+        const analyticsData = await analyticsRes.json()
+        setAnalyticsData(analyticsData)
       }
     } catch (error) {
       console.error("Error fetching data:", error)
@@ -100,109 +126,41 @@ export function AdminPanel() {
     }
   }
 
-  const handleAddFlight = async () => {
-    if (formData.number && formData.from && formData.to && formData.capacity) {
-      try {
-        const flightPayload = {
-          flightNumber: formData.number,
-          from: formData.from,
-          to: formData.to,
-          capacity: Number(formData.capacity),
-          airline: "Flight",
-          departure: formData.departure || "00:00",
-          arrival: formData.arrival || "00:00",
-          duration: formData.duration || "0h 0m",
-          price: Number(formData.price) || 299,
-          seats: Number(formData.capacity),
-          stops: "Non-stop",
-          date: formData.date || new Date().toISOString().split("T")[0],
-          booked: 0,
-        }
-
-        let response
-        if (editingFlight) {
-          response = await fetch(`/api/flights?id=${editingFlight.id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(flightPayload),
-          })
-        } else {
-          response = await fetch("/api/flights", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(flightPayload),
-          })
-        }
-
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || "Failed to save flight")
-        }
-
-        await fetchData()
-        setFormData({
-          number: "",
-          from: "",
-          to: "",
-          capacity: "",
-          departure: "",
-          arrival: "",
-          duration: "",
-          price: "",
-          date: "",
-        })
-        setShowAddFlight(false)
-        setEditingFlight(null)
-      } catch (error) {
-        console.error("Error saving flight:", error)
-        alert(`Failed to save flight: ${error instanceof Error ? error.message : "Unknown error"}`)
-      }
-    } else {
-      alert("Please fill in all required fields (Flight Number, From, To, Capacity)")
-    }
-  }
-
-  const handleEditFlight = (flight: Flight) => {
-    setEditingFlight(flight)
-    setFormData({
-      number: flight.flightNumber,
-      from: flight.from,
-      to: flight.to,
-      capacity: flight.capacity.toString(),
-      departure: flight.departure || "",
-      arrival: flight.arrival || "",
-      duration: flight.duration || "",
-      price: flight.price?.toString() || "",
-      date: flight.date || "",
-    })
-    setShowAddFlight(true)
-  }
-
   const handleDeleteFlight = async (id: string) => {
     if (!confirm("Are you sure you want to delete this flight?")) return
 
     try {
-      const response = await fetch(`/api/flights?id=${id}`, { method: "DELETE" })
-      if (!response.ok) throw new Error("Failed to delete flight")
-      await fetchData()
+      const res = await fetch(`/api/flights/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        setFlights(flights.filter(f => f.id !== id))
+        alert("Flight deleted successfully")
+      }
     } catch (error) {
       console.error("Error deleting flight:", error)
-      alert("Failed to delete flight. Please try again.")
+      alert("Failed to delete flight")
     }
   }
 
-  const handleUpdateBookingStatus = async (bookingId: string, newStatus: string) => {
+  const handleUpdateBookingStatus = async (bookingId: string, newStatus: "pending" | "confirmed" | "cancelled") => {
     try {
-      const response = await fetch(`/api/admin/bookings?id=${bookingId}`, {
+      const res = await fetch(`/api/bookings?id=${bookingId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: newStatus })
       })
-      if (!response.ok) throw new Error("Failed to update booking")
-      await fetchData()
+
+      if (res.ok) {
+        // Update local state
+        setBookings(bookings.map(b => 
+          b.id === bookingId ? { ...b, status: newStatus } : b
+        ))
+        alert(`Booking status updated to ${newStatus}`)
+      } else {
+        throw new Error("Failed to update booking")
+      }
     } catch (error) {
       console.error("Error updating booking:", error)
-      alert("Failed to update booking. Please try again.")
+      alert("Failed to update booking status")
     }
   }
 
@@ -210,473 +168,508 @@ export function AdminPanel() {
     if (!confirm("Are you sure you want to delete this booking?")) return
 
     try {
-      const response = await fetch(`/api/admin/bookings?id=${bookingId}`, { method: "DELETE" })
-      if (!response.ok) throw new Error("Failed to delete booking")
-      await fetchData()
+      const res = await fetch(`/api/bookings?id=${bookingId}`, { method: "DELETE" })
+      
+      if (res.ok) {
+        setBookings(bookings.filter(b => b.id !== bookingId))
+        alert("Booking deleted successfully")
+        // Refresh data to update analytics
+        fetchData()
+      } else {
+        throw new Error("Failed to delete booking")
+      }
     } catch (error) {
       console.error("Error deleting booking:", error)
-      alert("Failed to delete booking. Please try again.")
+      alert("Failed to delete booking")
     }
   }
 
-  const handleCancel = () => {
-    setShowAddFlight(false)
-    setEditingFlight(null)
-    setFormData({
-      number: "",
-      from: "",
-      to: "",
-      capacity: "",
-      departure: "",
-      arrival: "",
-      duration: "",
-      price: "",
-      date: "",
-    })
-  }
-
- const filteredBookings = bookingsData.filter((booking) => {
-  const matchesSearch =
-    searchTerm === "" ||
-    booking.bookingRef.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    booking.flight?.flightNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    booking.passengers.some((p) => p.name?.toLowerCase().includes(searchTerm.toLowerCase()))
-
-  const matchesStatus = statusFilter === "all" || booking.status === statusFilter
-
-  return matchesSearch && matchesStatus
-})
-
-  const displayAnalyticsData = analyticsData?.monthlyData || []
-  const displayRevenueDistribution = analyticsData?.revenueDistribution || []
-
-  if (loading) {
-    return (
-      <section className="py-12 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 min-h-screen">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center text-white">Loading admin panel...</div>
+  const StatCard = ({ icon: Icon, label, value, change, color }: any) => (
+    <div className="relative bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6 overflow-hidden group hover:border-slate-600 transition-all">
+      <div className={`absolute inset-0 bg-gradient-to-br ${color} opacity-0 group-hover:opacity-100 transition-opacity`} />
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-4">
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color.replace('/10', '/20')}`}>
+            <Icon className={`w-6 h-6 ${color.replace('from-', 'text-').replace('/10', '').split(' ')[0]}`} />
+          </div>
+          {change && (
+            <span className={`text-sm font-semibold ${change > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {change > 0 ? '+' : ''}{change}%
+            </span>
+          )}
         </div>
-      </section>
-    )
-  }
+        <p className="text-slate-400 text-sm mb-1">{label}</p>
+        <p className="text-3xl font-bold text-white">{value}</p>
+      </div>
+    </div>
+  )
+
+  // Get recent bookings
+  const recentBookings = [...(bookings || [])]
+    .sort((a, b) => {
+      const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0
+      const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0
+      return dateB - dateA
+    })
+    .slice(0, 5)
+
+  // Filter bookings by status
+  const filteredBookings = bookings.filter(b => {
+    const matchesSearch = b.bookingRef.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus = statusFilter === "all" || b.status === statusFilter
+    return matchesSearch && matchesStatus
+  })
+
+  // Count by status
+  const pendingCount = bookings.filter(b => b.status === "pending").length
+  const confirmedCount = bookings.filter(b => b.status === "confirmed").length
+  const cancelledCount = bookings.filter(b => b.status === "cancelled").length
 
   return (
-    <section className="py-12 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Admin Dashboard</h1>
-          <p className="text-slate-300">Manage flights, bookings, and view analytics</p>
+          <h1 className="text-4xl font-bold text-white mb-2">Admin Dashboard</h1>
+          <p className="text-slate-400">Manage flights, bookings, and view analytics</p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-slate-800 rounded-lg p-6 shadow-lg border border-emerald-500/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-400 mb-1">Total Flights</p>
-                <p className="text-3xl font-bold text-white">{analyticsData?.totalFlights || 0}</p>
-              </div>
-              <Plane size={32} className="text-emerald-400 opacity-20" />
-            </div>
-          </div>
-
-          <div className="bg-slate-800 rounded-lg p-6 shadow-lg border border-teal-500/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-400 mb-1">Total Passengers</p>
-                <p className="text-3xl font-bold text-white">{analyticsData?.totalPassengers || 0}</p>
-              </div>
-              <Users size={32} className="text-teal-400 opacity-20" />
-            </div>
-          </div>
-
-          <div className="bg-slate-800 rounded-lg p-6 shadow-lg border border-amber-500/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-400 mb-1">Total Revenue</p>
-                <p className="text-3xl font-bold text-white">₱{(analyticsData?.totalRevenue || 0).toLocaleString()}</p>
-              </div>
-              <PhilippinePeso size={32} className="text-amber-400 opacity-20" />
-            </div>
-          </div>
-
-          <div className="bg-slate-800 rounded-lg p-6 shadow-lg border border-cyan-500/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-400 mb-1">Total Bookings</p>
-                <p className="text-3xl font-bold text-white">{analyticsData?.totalBookings || 0}</p>
-              </div>
-              <TrendingUp size={32} className="text-cyan-400 opacity-20" />
-            </div>
-          </div>
+        {/* Navigation Tabs */}
+        <div className="flex gap-2 mb-8 bg-slate-800/30 backdrop-blur-xl border border-slate-700/50 rounded-xl p-2">
+          <button
+            onClick={() => setActiveTab("dashboard")}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
+              activeTab === "dashboard"
+                ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg"
+                : "text-slate-400 hover:text-white hover:bg-slate-700/50"
+            }`}
+          >
+            <LayoutDashboard className="w-5 h-5" />
+            Dashboard
+          </button>
+          <button
+            onClick={() => setActiveTab("flights")}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
+              activeTab === "flights"
+                ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg"
+                : "text-slate-400 hover:text-white hover:bg-slate-700/50"
+            }`}
+          >
+            <Plane className="w-5 h-5" />
+            Flights
+          </button>
+          <button
+            onClick={() => setActiveTab("bookings")}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all relative ${
+              activeTab === "bookings"
+                ? "bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg"
+                : "text-slate-400 hover:text-white hover:bg-slate-700/50"
+            }`}
+          >
+            <Package className="w-5 h-5" />
+            Bookings
+            {pendingCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-6 h-6 bg-orange-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                {pendingCount}
+              </span>
+            )}
+          </button>
         </div>
 
-        {/* Tabs */}
-        <div className="bg-slate-800 rounded-lg shadow-lg border border-slate-700 overflow-hidden">
-          <div className="border-b border-slate-700">
-            <div className="flex">
-              {["overview", "flights", "passengers"].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`flex-1 px-6 py-4 font-semibold transition ${
-                    activeTab === tab
-                      ? "text-emerald-400 border-b-2 border-emerald-400"
-                      : "text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
-              ))}
+        {/* Dashboard View */}
+        {activeTab === "dashboard" && (
+          <div className="space-y-8">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <StatCard
+                icon={Plane}
+                label="Total Flights"
+                value={analyticsData?.totalFlights || 0}
+                change={12}
+                color="from-blue-500/10 to-cyan-500/10"
+              />
+              <StatCard
+                icon={Users}
+                label="Total Passengers"
+                value={analyticsData?.totalPassengers || 0}
+                change={8}
+                color="from-purple-500/10 to-pink-500/10"
+              />
+              <StatCard
+                icon={DollarSign}
+                label="Total Revenue"
+                value={`₱${(analyticsData?.totalRevenue || 0).toLocaleString()}`}
+                change={15}
+                color="from-emerald-500/10 to-teal-500/10"
+              />
+              <StatCard
+                icon={BarChart3}
+                label="Pending Requests"
+                value={pendingCount}
+                color="from-orange-500/10 to-red-500/10"
+              />
             </div>
-          </div>
 
-          <div className="p-6">
-            {activeTab === "overview" && (
-              <div className="space-y-8">
-                <div>
-                  <h3 className="text-lg font-semibold text-white mb-4">Bookings & Revenue Trend</h3>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={displayAnalyticsData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis dataKey="month" stroke="#94a3b8" />
-                      <YAxis yAxisId="left" stroke="#94a3b8" />
-                      <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" />
-                      <Tooltip contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #475569" }} />
-                      <Legend />
-                      <Line yAxisId="left" type="monotone" dataKey="bookings" stroke="#10b981" strokeWidth={2} />
-                      <Line yAxisId="right" type="monotone" dataKey="revenue" stroke="#14b8a6" strokeWidth={2} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-4">Monthly Bookings</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={displayAnalyticsData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                        <XAxis dataKey="month" stroke="#94a3b8" />
-                        <YAxis stroke="#94a3b8" />
-                        <Tooltip contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #475569" }} />
-                        <Bar dataKey="bookings" fill="#10b981" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-semibold text-white mb-4">Revenue Distribution</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <PieChart>
-                        <Pie
-                          data={displayRevenueDistribution}
-                          dataKey="revenue"
-                          nameKey="month"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          label
-                        >
-                          {displayRevenueDistribution.map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip contentStyle={{ backgroundColor: "#1e293b", border: "1px solid #475569" }} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
+            {/* Recent Activity */}
+            <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <Activity className="w-6 h-6 text-emerald-400" />
+                  Recent Bookings
+                </h2>
               </div>
-            )}
 
-            {activeTab === "flights" && (
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-semibold text-white">Manage Flights</h3>
-                  {!showAddFlight && (
-                    <button
-                      onClick={() => setShowAddFlight(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg hover:from-emerald-600 hover:to-teal-600 transition"
+              {recentBookings.length > 0 ? (
+                <div className="space-y-4">
+                  {recentBookings.map((booking, index) => (
+                    <div
+                      key={booking.id || index}
+                      className="flex items-center justify-between p-4 bg-slate-900/50 rounded-xl border border-slate-700/30"
                     >
-                      <Plus size={18} /> Add Flight
-                    </button>
-                  )}
-                </div>
-
-                {showAddFlight && (
-                  <div className="bg-slate-700 p-6 rounded-lg mb-6 border border-slate-600">
-                    <div className="flex justify-between items-center mb-4">
-                      <h4 className="font-semibold text-white">{editingFlight ? "Edit Flight" : "Add New Flight"}</h4>
-                      <button onClick={handleCancel} className="text-slate-400 hover:text-slate-200">
-                        <X size={20} />
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <input
-                        type="text"
-                        placeholder="Flight Number"
-                        value={formData.number}
-                        onChange={(e) => setFormData({ ...formData, number: e.target.value })}
-                        className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-slate-400"
-                      />
-                      <input
-                        type="text"
-                        placeholder="From"
-                        value={formData.from}
-                        onChange={(e) => setFormData({ ...formData, from: e.target.value })}
-                        className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-slate-400"
-                      />
-                      <input
-                        type="text"
-                        placeholder="To"
-                        value={formData.to}
-                        onChange={(e) => setFormData({ ...formData, to: e.target.value })}
-                        className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-slate-400"
-                      />
-                      <input
-                        type="number"
-                        placeholder="Capacity"
-                        value={formData.capacity}
-                        onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-                        className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-slate-400"
-                      />
-                      <input
-                        type="time"
-                        placeholder="Departure"
-                        value={formData.departure}
-                        onChange={(e) => setFormData({ ...formData, departure: e.target.value })}
-                        className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-slate-400"
-                      />
-                      <input
-                        type="time"
-                        placeholder="Arrival"
-                        value={formData.arrival}
-                        onChange={(e) => setFormData({ ...formData, arrival: e.target.value })}
-                        className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-slate-400"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Duration (e.g., 2h 30m)"
-                        value={formData.duration}
-                        onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                        className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-slate-400"
-                      />
-                      <input
-                        type="number"
-                        placeholder="Price"
-                        value={formData.price}
-                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                        className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-slate-400"
-                      />
-                      <input
-                        type="date"
-                        placeholder="Date"
-                        value={formData.date}
-                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                        className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-slate-400"
-                      />
-                      <div className="flex gap-2 md:col-span-3">
-                        <button
-                          onClick={handleAddFlight}
-                          className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition font-semibold"
-                        >
-                          {editingFlight ? "Update" : "Save"}
-                        </button>
-                        <button
-                          onClick={handleCancel}
-                          className="flex-1 px-4 py-2 bg-slate-600 text-slate-200 rounded-lg hover:bg-slate-500 transition font-semibold"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-slate-700">
-                        <th className="text-left py-3 px-4 font-semibold text-slate-200">Flight</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-200">Route</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-200">Date</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-200">Capacity</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-200">Booked</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-200">Occupancy</th>
-                        <th className="text-left py-3 px-4 font-semibold text-slate-200">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {flightData.map((flight) => (
-                        <tr key={flight.id} className="border-b border-slate-700 hover:bg-slate-700/50">
-                          <td className="py-3 px-4 font-semibold text-white">{flight.flightNumber}</td>
-                          <td className="py-3 px-4 text-slate-300">
-                            {flight.from} → {flight.to}
-                          </td>
-                          <td className="py-3 px-4 text-slate-300">{flight.date}</td>
-                          <td className="py-3 px-4 text-slate-300">{flight.capacity}</td>
-                          <td className="py-3 px-4 text-slate-300">{flight.booked || 0}</td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2">
-                              <div className="w-16 h-2 bg-slate-600 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-500"
-                                  style={{ width: `${((flight.booked || 0) / flight.capacity) * 100}%` }}
-                                />
-                              </div>
-                              <span className="text-sm font-semibold text-slate-200">
-                                {Math.round(((flight.booked || 0) / flight.capacity) * 100)}%
-                              </span>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 flex gap-2">
-                            <button
-                              onClick={() => handleEditFlight(flight)}
-                              className="p-2 text-emerald-400 hover:bg-slate-700 rounded transition"
-                            >
-                              <Edit2 size={18} />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteFlight(flight.id)}
-                              className="p-2 text-red-400 hover:bg-slate-700 rounded transition"
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {activeTab === "passengers" && (
-              <div>
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-semibold text-white">Passenger Bookings</h3>
-                  <div className="flex gap-4">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-                      <input
-                        type="text"
-                        placeholder="Search bookings..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white placeholder-slate-400"
-                      />
-                    </div>
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white"
-                    >
-                      <option value="all">All Status</option>
-                      <option value="confirmed">Confirmed</option>
-                      <option value="pending">Pending</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="completed">Completed</option>
-                    </select>
-                  </div>
-                </div>
-
-                {filteredBookings.length === 0 ? (
-                  <div className="text-center text-slate-400 py-12">
-                    <Users size={48} className="mx-auto mb-4 opacity-50" />
-                    <p>No bookings found</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {filteredBookings.map((booking) => (
-                      <div key={booking.id} className="bg-slate-700 rounded-lg p-6 border border-slate-600">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <div className="flex items-center gap-3 mb-2">
-                              <h4 className="font-semibold text-white text-lg">Booking #{booking.bookingRef}</h4>
-                              <span
-                                className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                                  booking.status === "confirmed"
-                                    ? "bg-emerald-500/20 text-emerald-300"
-                                    : booking.status === "pending"
-                                      ? "bg-amber-500/20 text-amber-300"
-                                      : booking.status === "cancelled"
-                                        ? "bg-red-500/20 text-red-300"
-                                        : "bg-teal-500/20 text-teal-300"
-                                }`}
-                              >
-                                {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-                              </span>
-                            </div>
-                            {booking.flight && (
-                              <div className="text-slate-300 mb-2">
-                                <span className="font-semibold text-emerald-400">{booking.flight.flightNumber}</span>
-                                {" • "}
-                                {booking.flight.from} → {booking.flight.to}
-                                {" • "}
-                                {booking.flight.date} at {booking.flight.departure}
-                              </div>
-                            )}
-                            <div className="text-sm text-slate-400">
-                              Booked: {new Date(booking.createdAt).toLocaleDateString()}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-2xl font-bold text-white mb-2">
-                              ₱{booking.totalPrice.toLocaleString()}
-                            </div>
-                            <div className="flex gap-2">
-                              <select
-                                value={booking.status}
-                                onChange={(e) => handleUpdateBookingStatus(booking.id, e.target.value)}
-                                className="px-3 py-1 bg-slate-600 border border-slate-500 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                              >
-                                <option value="pending">Pending</option>
-                                <option value="confirmed">Confirmed</option>
-                                <option value="completed">Completed</option>
-                                <option value="cancelled">Cancelled</option>
-                              </select>
-                              <button
-                                onClick={() => handleDeleteBooking(booking.id)}
-                                className="p-2 text-red-400 hover:bg-slate-600 rounded transition"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="border-t border-slate-600 pt-4">
-                          <h5 className="font-semibold text-white mb-3">Passengers ({booking.passengers.length})</h5>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {booking.passengers.map((passenger, idx) => (
-                              <div key={idx} className="bg-slate-600 rounded p-3">
-                                <div className="font-semibold text-white">{passenger.name}</div>
-                                <div className="text-sm text-slate-300">{passenger.email}</div>
-                                <div className="text-sm text-slate-400">{passenger.phone}</div>
-                                {passenger.seatAssignment && (
-                                  <div className="text-sm text-emerald-400 font-semibold mt-1">
-                                    Seat: {passenger.seatAssignment}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                          {booking.selectedSeats && booking.selectedSeats.length > 0 && (
-                            <div className="mt-3 text-sm text-slate-400">
-                              Selected Seats: {booking.selectedSeats.join(", ")}
-                            </div>
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                          booking.status === "confirmed" 
+                            ? "bg-emerald-500/20" 
+                            : booking.status === "pending"
+                            ? "bg-orange-500/20"
+                            : "bg-red-500/20"
+                        }`}>
+                          {booking.status === "confirmed" ? (
+                            <CheckCircle className="w-5 h-5 text-emerald-400" />
+                          ) : booking.status === "pending" ? (
+                            <Clock className="w-5 h-5 text-orange-400" />
+                          ) : (
+                            <XCircle className="w-5 h-5 text-red-400" />
                           )}
                         </div>
+                        <div>
+                          <p className="font-semibold text-white">{booking.bookingRef}</p>
+                          <p className="text-sm text-slate-400">
+                            {booking.passengers?.length || 0} passengers
+                            {booking.flight && ` • ${booking.flight.from} → ${booking.flight.to}`}
+                          </p>
+                        </div>
                       </div>
-                    ))}
+                      <div className="text-right">
+                        <p className="font-bold text-emerald-400">₱{booking.totalPrice.toLocaleString()}</p>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          booking.status === "confirmed"
+                            ? "bg-emerald-500/20 text-emerald-400"
+                            : booking.status === "pending"
+                            ? "bg-orange-500/20 text-orange-400"
+                            : "bg-red-500/20 text-red-400"
+                        }`}>
+                          {booking.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <AlertCircle className="w-12 h-12 text-slate-500 mx-auto mb-3" />
+                  <p className="text-slate-400">No recent bookings</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Flights View */}
+        {activeTab === "flights" && (
+          <div className="space-y-6">
+            {/* Search and Actions Bar */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-slate-800/30 backdrop-blur-xl border border-slate-700/50 rounded-xl p-4">
+              <div className="relative flex-1 w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search flights by number, route..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+                />
+              </div>
+              <button
+                onClick={() => setShowAddFlight(true)}
+                className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold rounded-lg transition-all shadow-lg hover:shadow-xl flex items-center gap-2 whitespace-nowrap"
+              >
+                <Plus className="w-5 h-5" />
+                Add Flight
+              </button>
+            </div>
+
+            {/* Flights Table */}
+            <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-900/50">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Flight</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Route</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Capacity</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Booked</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Occupancy</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/30">
+                    {(flights || [])
+                      .filter(f => 
+                        f.flightNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        f.from.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        f.to.toLowerCase().includes(searchTerm.toLowerCase())
+                      )
+                      .map((flight) => {
+                        const occupancy = flight.capacity ? ((flight.booked || 0) / flight.capacity) * 100 : 0
+                        return (
+                          <tr key={flight.id} className="hover:bg-slate-900/30 transition-colors">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                                  <Plane className="w-5 h-5 text-blue-400" />
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-white">{flight.flightNumber}</p>
+                                  <p className="text-sm text-slate-400">{flight.airline}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-white">{flight.from}</span>
+                                <MapPin className="w-4 h-4 text-slate-500" />
+                                <span className="font-medium text-white">{flight.to}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-2 text-slate-300">
+                                <Calendar className="w-4 h-4 text-slate-500" />
+                                {flight.date}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-white font-semibold">{flight.capacity}</td>
+                            <td className="px-6 py-4">
+                              <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm font-semibold">
+                                {flight.booked || 0}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full ${
+                                      occupancy >= 80 ? 'bg-red-500' : occupancy >= 50 ? 'bg-yellow-500' : 'bg-emerald-500'
+                                    }`}
+                                    style={{ width: `${occupancy}%` }}
+                                  />
+                                </div>
+                                <span className="text-sm font-semibold text-slate-300 min-w-[3rem]">
+                                  {occupancy.toFixed(0)}%
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => setSelectedFlight(flight)}
+                                  className="p-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition"
+                                  title="Edit"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteFlight(flight.id)}
+                                  className="p-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bookings View */}
+        {activeTab === "bookings" && (
+          <div className="space-y-6">
+            {/* Search and Filter Bar */}
+            <div className="bg-slate-800/30 backdrop-blur-xl border border-slate-700/50 rounded-xl p-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search bookings by reference..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setStatusFilter("all")}
+                    className={`px-4 py-2 rounded-lg font-semibold transition ${
+                      statusFilter === "all"
+                        ? "bg-slate-700 text-white"
+                        : "bg-slate-900/50 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    All ({bookings.length})
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter("pending")}
+                    className={`px-4 py-2 rounded-lg font-semibold transition ${
+                      statusFilter === "pending"
+                        ? "bg-orange-500/20 text-orange-400"
+                        : "bg-slate-900/50 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Pending ({pendingCount})
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter("confirmed")}
+                    className={`px-4 py-2 rounded-lg font-semibold transition ${
+                      statusFilter === "confirmed"
+                        ? "bg-emerald-500/20 text-emerald-400"
+                        : "bg-slate-900/50 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Confirmed ({confirmedCount})
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter("cancelled")}
+                    className={`px-4 py-2 rounded-lg font-semibold transition ${
+                      statusFilter === "cancelled"
+                        ? "bg-red-500/20 text-red-400"
+                        : "bg-slate-900/50 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Cancelled ({cancelledCount})
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Bookings Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {filteredBookings.map((booking) => (
+                <div
+                  key={booking.id}
+                  className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6 hover:border-slate-600 transition-all"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-xl font-bold text-white mb-1">{booking.bookingRef}</h3>
+                      <p className="text-sm text-slate-400">
+                        {booking.createdAt?.seconds 
+                          ? new Date(booking.createdAt.seconds * 1000).toLocaleDateString()
+                          : 'N/A'}
+                      </p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                      booking.status === "confirmed"
+                        ? "bg-emerald-500/20 text-emerald-400"
+                        : booking.status === "pending"
+                        ? "bg-orange-500/20 text-orange-400"
+                        : "bg-red-500/20 text-red-400"
+                    }`}>
+                      {booking.status}
+                    </span>
                   </div>
-                )}
+                  
+                  <div className="space-y-3 mb-4">
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <Users className="w-4 h-4 text-slate-500" />
+                      <span className="text-sm">{booking.passengers.length} passengers</span>
+                    </div>
+                    {booking.flight && (
+                      <div className="flex items-center gap-2 text-slate-300">
+                        <Plane className="w-4 h-4 text-slate-500" />
+                        <span className="text-sm">
+                          {booking.flight.flightNumber} • {booking.flight.from} → {booking.flight.to}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-700/50 mb-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">Total Price</span>
+                      <span className="text-2xl font-bold text-emerald-400">
+                        ₱{booking.totalPrice.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-2">
+                    {booking.status === "pending" && (
+                      <button
+                        onClick={() => handleUpdateBookingStatus(booking.id, "confirmed")}
+                        className="flex-1 px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-lg transition flex items-center justify-center gap-2 font-semibold"
+                      >
+                        <Check className="w-4 h-4" />
+                        Confirm
+                      </button>
+                    )}
+                    {booking.status === "confirmed" && (
+                      <button
+                        onClick={() => handleUpdateBookingStatus(booking.id, "pending")}
+                        className="flex-1 px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded-lg transition flex items-center justify-center gap-2 font-semibold"
+                      >
+                        <Clock className="w-4 h-4" />
+                        Set Pending
+                      </button>
+                    )}
+                    {booking.status !== "cancelled" && (
+                      <button
+                        onClick={() => handleUpdateBookingStatus(booking.id, "cancelled")}
+                        className="flex-1 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition flex items-center justify-center gap-2 font-semibold"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Cancel
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDeleteBooking(booking.id)}
+                      className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition"
+                      title="Delete Booking"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {filteredBookings.length === 0 && (
+              <div className="text-center py-16 bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl">
+                <AlertCircle className="w-16 h-16 text-slate-500 mx-auto mb-4" />
+                <p className="text-xl text-slate-400">No bookings found</p>
               </div>
             )}
           </div>
-        </div>
+        )}
+
+        {/* Loading State */}
+        {loading && (
+          <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="text-center">
+              <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin mx-auto mb-4" />
+              <p className="text-slate-400 text-lg">Loading data...</p>
+            </div>
+          </div>
+        )}
       </div>
-    </section>
+    </div>
   )
 }

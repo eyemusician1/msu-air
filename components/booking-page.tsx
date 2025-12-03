@@ -209,7 +209,7 @@ export function BookingPage() {
       selectedSeats: selectedSeats,
       totalPrice: totalPrice,
       bookingRef: `${flight.flightNumber}-${Date.now()}`,
-      status: "confirmed",
+      status: "Pending",
     }
 
     console.log("Sending booking data:", bookingData)

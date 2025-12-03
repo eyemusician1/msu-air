@@ -1,34 +1,38 @@
-import { getAllBookings, getBookingById, updateBooking, deleteBooking, getFlightById } from "@/lib/firestore"
-import { type NextRequest, NextResponse } from "next/server"
+import { getAllBookings, getFlightById } from "@/lib/firestore"
+import { NextResponse } from "next/server"
 
 export const dynamic = "force-dynamic"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const searchParams = request.nextUrl.searchParams
-    const id = searchParams.get("id")
+    console.log("[Admin Bookings] Fetching all bookings...")
+    
+    const bookings = await getAllBookings()
+    console.log(`[Admin Bookings] Found ${bookings.length} bookings`)
 
-    if (id) {
-      const booking = await getBookingById(id)
-      if (!booking) {
-        return NextResponse.json({ error: "Booking not found" }, { status: 404 })
-      }
-      return NextResponse.json(booking)
+    // If no bookings, return empty array
+    if (!bookings || bookings.length === 0) {
+      console.log("[Admin Bookings] No bookings found, returning empty array")
+      return NextResponse.json([])
     }
 
-    const bookings = await getAllBookings()
-    console.log("[v0] Fetched bookings:", bookings.length)
-
     // Enrich bookings with flight information
+    console.log("[Admin Bookings] Enriching bookings with flight data...")
     const enrichedBookings = await Promise.all(
       bookings.map(async (booking) => {
         try {
+          if (!booking.flightId) {
+            console.warn("[Admin Bookings] Booking has no flightId:", booking.id)
+            return booking
+          }
+
           const flight = await getFlightById(booking.flightId)
           return {
             ...booking,
             flight: flight
               ? {
                   flightNumber: flight.flightNumber,
+                  airline: flight.airline,
                   from: flight.from,
                   to: flight.to,
                   date: flight.date,
@@ -38,58 +42,22 @@ export async function GET(request: NextRequest) {
               : null,
           }
         } catch (err) {
-          console.error("[v0] Error enriching booking:", err)
+          console.error("[Admin Bookings] Error enriching booking:", booking.id, err)
           return booking
         }
-      }),
+      })
     )
 
-    console.log("[v0] Enriched bookings:", enrichedBookings.length)
+    console.log(`[Admin Bookings] Successfully enriched ${enrichedBookings.length} bookings`)
     return NextResponse.json(enrichedBookings)
   } catch (error) {
-    console.error("[v0] Error fetching bookings:", error)
-    return NextResponse.json({ error: "Failed to fetch bookings", details: String(error) }, { status: 500 })
-  }
-}
-
-export async function PUT(request: NextRequest) {
-  try {
-    const searchParams = request.nextUrl.searchParams
-    const id = searchParams.get("id")
-
-    if (!id) {
-      return NextResponse.json({ error: "Booking ID is required" }, { status: 400 })
-    }
-
-    const body = await request.json()
-
-    const updates = {
-      ...(body.status && { status: body.status }),
-      ...(body.passengers && { passengers: body.passengers }),
-      ...(body.totalPrice !== undefined && { totalPrice: body.totalPrice }),
-    }
-
-    await updateBooking(id, updates)
-    return NextResponse.json({ success: true, id })
-  } catch (error) {
-    console.error("Error updating booking:", error)
-    return NextResponse.json({ error: "Failed to update booking" }, { status: 500 })
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  try {
-    const searchParams = request.nextUrl.searchParams
-    const id = searchParams.get("id")
-
-    if (!id) {
-      return NextResponse.json({ error: "Booking ID is required" }, { status: 400 })
-    }
-
-    await deleteBooking(id)
-    return NextResponse.json({ success: true, id })
-  } catch (error) {
-    console.error("Error deleting booking:", error)
-    return NextResponse.json({ error: "Failed to delete booking" }, { status: 500 })
+    console.error("[Admin Bookings] Error:", error)
+    return NextResponse.json(
+      { 
+        error: "Failed to fetch bookings", 
+        details: error instanceof Error ? error.message : String(error) 
+      }, 
+      { status: 500 }
+    )
   }
 }
