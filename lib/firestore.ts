@@ -1,12 +1,30 @@
 // Firestore utility functions for database operations
-import { collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, getFirestore, orderBy } from "firebase/firestore"
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  setDoc,
+  query,
+  where,
+  getFirestore,
+  orderBy,
+} from "firebase/firestore"
 import { app } from "./firebase"
 import type { Flight, Booking, User } from "./types"
 
 const db = getFirestore(app)
 
-// ============ FLIGHTS ============
+// ============================================
+// FLIGHTS
+// ============================================
 
+/**
+ * Get all flights from the database
+ */
 export async function getFlights(): Promise<Flight[]> {
   try {
     const flightsCollection = collection(db, "flights")
@@ -21,6 +39,9 @@ export async function getFlights(): Promise<Flight[]> {
   }
 }
 
+/**
+ * Get a single flight by ID
+ */
 export async function getFlightById(flightId: string): Promise<Flight | null> {
   try {
     const flightDoc = doc(db, "flights", flightId)
@@ -35,10 +56,18 @@ export async function getFlightById(flightId: string): Promise<Flight | null> {
   }
 }
 
+/**
+ * Search flights by departure, arrival, and date
+ */
 export async function searchFlights(from: string, to: string, date: string): Promise<Flight[]> {
   try {
     const flightsCollection = collection(db, "flights")
-    const q = query(flightsCollection, where("from", "==", from), where("to", "==", to), where("date", "==", date))
+    const q = query(
+      flightsCollection,
+      where("from", "==", from),
+      where("to", "==", to),
+      where("date", "==", date)
+    )
     const snapshot = await getDocs(q)
     return snapshot.docs.map((doc) => ({
       id: doc.id,
@@ -50,6 +79,9 @@ export async function searchFlights(from: string, to: string, date: string): Pro
   }
 }
 
+/**
+ * Add a new flight to the database
+ */
 export async function addFlight(flight: Omit<Flight, "id" | "createdAt" | "updatedAt">): Promise<string> {
   try {
     const flightsCollection = collection(db, "flights")
@@ -65,6 +97,9 @@ export async function addFlight(flight: Omit<Flight, "id" | "createdAt" | "updat
   }
 }
 
+/**
+ * Update an existing flight
+ */
 export async function updateFlight(flightId: string, updates: Partial<Flight>): Promise<void> {
   try {
     const flightDoc = doc(db, "flights", flightId)
@@ -78,6 +113,9 @@ export async function updateFlight(flightId: string, updates: Partial<Flight>): 
   }
 }
 
+/**
+ * Delete a flight from the database
+ */
 export async function deleteFlight(flightId: string): Promise<void> {
   try {
     const flightDoc = doc(db, "flights", flightId)
@@ -88,8 +126,13 @@ export async function deleteFlight(flightId: string): Promise<void> {
   }
 }
 
-// ============ BOOKINGS ============
+// ============================================
+// BOOKINGS
+// ============================================
 
+/**
+ * Get all bookings for a specific user
+ */
 export async function getBookings(userId: string): Promise<Booking[]> {
   try {
     const bookingsCollection = collection(db, "bookings")
@@ -105,16 +148,18 @@ export async function getBookings(userId: string): Promise<Booking[]> {
   }
 }
 
+/**
+ * Get all reserved seats for a specific flight
+ */
 export async function getReservedSeatsForFlight(flightId: string): Promise<string[]> {
   try {
     const bookingsCollection = collection(db, "bookings")
     const q = query(
-      bookingsCollection, 
+      bookingsCollection,
       where("flightId", "==", flightId),
       where("status", "in", ["confirmed", "pending"])
     )
     const snapshot = await getDocs(q)
-    
     const reservedSeats: string[] = []
     snapshot.docs.forEach((doc) => {
       const booking = doc.data() as Booking
@@ -122,7 +167,6 @@ export async function getReservedSeatsForFlight(flightId: string): Promise<strin
         reservedSeats.push(...booking.selectedSeats)
       }
     })
-    
     return reservedSeats
   } catch (error) {
     console.error("Error fetching reserved seats:", error)
@@ -130,6 +174,9 @@ export async function getReservedSeatsForFlight(flightId: string): Promise<strin
   }
 }
 
+/**
+ * Get all bookings (admin function)
+ */
 export async function getAllBookings(): Promise<Booking[]> {
   try {
     const bookingsCollection = collection(db, "bookings")
@@ -145,6 +192,9 @@ export async function getAllBookings(): Promise<Booking[]> {
   }
 }
 
+/**
+ * Get all bookings for a specific flight
+ */
 export async function getBookingsByFlight(flightId: string): Promise<Booking[]> {
   try {
     const bookingsCollection = collection(db, "bookings")
@@ -160,6 +210,9 @@ export async function getBookingsByFlight(flightId: string): Promise<Booking[]> 
   }
 }
 
+/**
+ * Get a single booking by ID
+ */
 export async function getBookingById(bookingId: string): Promise<Booking | null> {
   try {
     const bookingDoc = doc(db, "bookings", bookingId)
@@ -174,6 +227,9 @@ export async function getBookingById(bookingId: string): Promise<Booking | null>
   }
 }
 
+/**
+ * Create a new booking
+ */
 export async function createBooking(booking: Omit<Booking, "id" | "createdAt" | "updatedAt">): Promise<string> {
   try {
     const bookingsCollection = collection(db, "bookings")
@@ -189,6 +245,9 @@ export async function createBooking(booking: Omit<Booking, "id" | "createdAt" | 
   }
 }
 
+/**
+ * Update an existing booking
+ */
 export async function updateBooking(bookingId: string, updates: Partial<Booking>): Promise<void> {
   try {
     const bookingDoc = doc(db, "bookings", bookingId)
@@ -202,6 +261,9 @@ export async function updateBooking(bookingId: string, updates: Partial<Booking>
   }
 }
 
+/**
+ * Cancel a booking (sets status to "cancelled")
+ */
 export async function cancelBooking(bookingId: string): Promise<void> {
   try {
     await updateBooking(bookingId, { status: "cancelled" })
@@ -211,6 +273,9 @@ export async function cancelBooking(bookingId: string): Promise<void> {
   }
 }
 
+/**
+ * Delete a booking from the database
+ */
 export async function deleteBooking(bookingId: string): Promise<void> {
   try {
     const bookingDoc = doc(db, "bookings", bookingId)
@@ -221,8 +286,13 @@ export async function deleteBooking(bookingId: string): Promise<void> {
   }
 }
 
-// ============ USERS ============
+// ============================================
+// USERS
+// ============================================
 
+/**
+ * Get a user by their ID
+ */
 export async function getUserById(userId: string): Promise<User | null> {
   try {
     const userDoc = doc(db, "users", userId)
@@ -237,33 +307,36 @@ export async function getUserById(userId: string): Promise<User | null> {
   }
 }
 
+/**
+ * Create a new user document
+ * Uses setDoc with merge:true to handle both create and update scenarios
+ */
 export async function createUser(userId: string, user: Omit<User, "id" | "createdAt" | "updatedAt">): Promise<void> {
   try {
+    console.log("Creating user document for:", userId)
     const userDoc = doc(db, "users", userId)
-    const userDocSnapshot = await getDoc(userDoc)
     
-    if (!userDocSnapshot.exists()) {
-      // Create new user document with setDoc instead of addDoc
-      const { setDoc } = await import("firebase/firestore")
-      await setDoc(userDoc, {
+    await setDoc(
+      userDoc,
+      {
         ...user,
-        role: user.role || "user", // Default to "user" if not specified
+        role: user.role || "user",
         createdAt: new Date(),
         updatedAt: new Date(),
-      })
-    } else {
-      // Update existing document
-      await updateDoc(userDoc, {
-        ...user,
-        updatedAt: new Date(),
-      })
-    }
+      },
+      { merge: true } // This allows updating if exists, creating if not
+    )
+    
+    console.log("User document created successfully")
   } catch (error) {
     console.error("Error creating user:", error)
     throw error
   }
 }
 
+/**
+ * Update an existing user document
+ */
 export async function updateUser(userId: string, updates: Partial<User>): Promise<void> {
   try {
     const userDoc = doc(db, "users", userId)
@@ -273,6 +346,36 @@ export async function updateUser(userId: string, updates: Partial<User>): Promis
     })
   } catch (error) {
     console.error("Error updating user:", error)
+    throw error
+  }
+}
+
+/**
+ * Delete a user document (admin only)
+ */
+export async function deleteUser(userId: string): Promise<void> {
+  try {
+    const userDoc = doc(db, "users", userId)
+    await deleteDoc(userDoc)
+  } catch (error) {
+    console.error("Error deleting user:", error)
+    throw error
+  }
+}
+
+/**
+ * Get all users (admin function)
+ */
+export async function getAllUsers(): Promise<User[]> {
+  try {
+    const usersCollection = collection(db, "users")
+    const snapshot = await getDocs(usersCollection)
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as User[]
+  } catch (error) {
+    console.error("Error fetching all users:", error)
     throw error
   }
 }

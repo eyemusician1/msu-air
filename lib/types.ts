@@ -45,7 +45,9 @@ export interface User {
   displayName: string
   phone?: string
   passport?: string
-  role?: "user" | "admin"  // ADD THIS LINE
+  dateOfBirth?: string  // ADD THIS
+  gender?: "male" | "female" | "other" | "prefer-not-to-say"  // ADD THIS
+  role?: "user" | "admin"
   createdAt: Date
   updatedAt: Date
 }
