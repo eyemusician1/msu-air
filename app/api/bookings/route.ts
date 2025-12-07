@@ -1,3 +1,22 @@
+import { updateBooking } from "@/lib/firestore"
+export async function PUT(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams
+    const bookingId = searchParams.get("id")
+    if (!bookingId) {
+      return NextResponse.json({ error: "Booking ID is required" }, { status: 400 })
+    }
+    const updates = await request.json()
+    const updated = await updateBooking(bookingId, updates)
+    if (!updated) {
+      return NextResponse.json({ error: "Booking not found or not updated" }, { status: 404 })
+    }
+    return NextResponse.json(updated)
+  } catch (error) {
+    console.error("Error updating booking:", error)
+    return NextResponse.json({ error: "Failed to update booking" }, { status: 500 })
+  }
+}
 import { createBooking, getBookings, getFlightById, updateFlight, getReservedSeatsForFlight } from "@/lib/firestore"
 import { type NextRequest, NextResponse } from "next/server"
 

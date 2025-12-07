@@ -15,6 +15,7 @@ export default function BookingsPage() {
   const [bookings, setBookings] = useState<(Booking & { flight?: Flight })[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [sortBy, setSortBy] = useState<string>("date-desc")
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -125,12 +126,46 @@ export default function BookingsPage() {
           </div>
         )}
 
+        {/* Sorting Dropdown */}
+        {!loading && bookings.length > 0 && (
+          <div className="mb-6 flex justify-end">
+            <label className="text-slate-400 font-medium mr-2">Sort by:</label>
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+              className="bg-slate-800 text-white px-3 py-2 rounded-lg border border-slate-700 focus:outline-none"
+            >
+              <option value="date-desc">Flight Date (Newest)</option>
+              <option value="date-asc">Flight Date (Oldest)</option>
+              <option value="airline">Airline</option>
+              <option value="status">Status</option>
+            </select>
+          </div>
+        )}
+
         {/* Bookings Grid */}
         {!loading && bookings.length > 0 && (
           <div className="space-y-6">
-            {bookings.map((booking) => (
-              <BookingCard key={booking.id} booking={booking} />
-            ))}
+            {bookings
+              .slice() // copy array
+              .sort((a, b) => {
+                if (sortBy === "date-desc") {
+                  return new Date(b.flight?.date || "") > new Date(a.flight?.date || "") ? 1 : -1
+                }
+                if (sortBy === "date-asc") {
+                  return new Date(a.flight?.date || "") > new Date(b.flight?.date || "") ? 1 : -1
+                }
+                if (sortBy === "airline") {
+                  return (a.flight?.airline || "").localeCompare(b.flight?.airline || "")
+                }
+                if (sortBy === "status") {
+                  return (a.status || "").localeCompare(b.status || "")
+                }
+                return 0
+              })
+              .map((booking) => (
+                <BookingCard key={booking.id} booking={booking} />
+              ))}
           </div>
         )}
       </div>

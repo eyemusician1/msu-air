@@ -65,26 +65,6 @@ export function FlightCard({ flight, isPopular }: FlightCardProps) {
         </div>
       )}
 
-      {/* Popular Badge */}
-      {isPopular && !isSoldOut && (
-        <div className="absolute top-4 right-4 z-10">
-          <div className="flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full text-xs font-bold text-white shadow-lg">
-            <Zap className="w-3 h-3" />
-            Popular
-          </div>
-        </div>
-      )}
-
-      {/* Good Deal Badge */}
-      {isGoodDeal && (
-        <div className="absolute top-4 left-4 z-10">
-          <div className="flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full text-xs font-bold text-white shadow-lg">
-            <TrendingDown className="w-3 h-3" />
-            {pricePercentage}% OFF
-          </div>
-        </div>
-      )}
-
       <div className="p-6">
         {/* Airline & Flight Number */}
         <div className="flex items-center justify-between mb-6">

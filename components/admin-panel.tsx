@@ -26,21 +26,10 @@ import {
   XCircle,
   MoreVertical
 } from "lucide-react"
+import { FlightDialog } from "./flight-dialog"
+import type { Flight } from "@/lib/types"
 
-interface Flight {
-  id: string
-  flightNumber: string
-  airline: string
-  from: string
-  to: string
-  date: string
-  departure: string
-  arrival: string
-  duration: string
-  price: number
-  capacity: number
-  booked?: number
-}
+// Using shared `Flight` type from `lib/types` (imported above)
 
 interface Booking {
   id: string
@@ -78,8 +67,9 @@ export function AdminPanel() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "confirmed" | "cancelled">("all")
-  const [showAddFlight, setShowAddFlight] = useState(false)
+  const [showFlightDialog, setShowFlightDialog] = useState(false)
   const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null)
+  const [dialogMode, setDialogMode] = useState<"add" | "edit">("add")
 
   useEffect(() => {
     fetchData()
@@ -127,21 +117,92 @@ export function AdminPanel() {
     }
   }
 
-  const handleDeleteFlight = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this flight?")) return
+  // Flight CRUD Operations
+  const handleAddFlight = () => {
+    setSelectedFlight(null)
+    setDialogMode("add")
+    setShowFlightDialog(true)
+  }
 
+  const handleEditFlight = (flight: Flight) => {
+    setSelectedFlight(flight)
+    setDialogMode("edit")
+    setShowFlightDialog(true)
+  }
+
+  const handleSubmitFlight = async (flightData: Partial<Flight>) => {
     try {
-      const res = await fetch(`/api/flights/${id}`, { method: "DELETE" })
-      if (res.ok) {
-        setFlights(flights.filter(f => f.id !== id))
-        alert("Flight deleted successfully")
+      if (dialogMode === "add") {
+        // Create new flight
+        const res = await fetch("/api/flights", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...flightData,
+            booked: 0 // New flights start with 0 bookings
+          })
+        })
+
+        if (!res.ok) {
+          const error = await res.json()
+          throw new Error(error.error || "Failed to create flight")
+        }
+
+        const newFlight = await res.json()
+        setFlights([...flights, newFlight])
+        alert("✈️ Flight created successfully!")
+      } else {
+        // Update existing flight
+        const res = await fetch(`/api/flights/${selectedFlight?.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(flightData)
+        })
+
+        if (!res.ok) {
+          const error = await res.json()
+          throw new Error(error.error || "Failed to update flight")
+        }
+
+        const updatedFlight = await res.json()
+        setFlights(flights.map(f => f.id === updatedFlight.id ? updatedFlight : f))
+        alert("✅ Flight updated successfully!")
       }
-    } catch (error) {
-      console.error("Error deleting flight:", error)
-      alert("Failed to delete flight")
+
+      setShowFlightDialog(false)
+      setSelectedFlight(null)
+      fetchData() // Refresh data
+    } catch (error: any) {
+      console.error("Error submitting flight:", error)
+      alert(`❌ Error: ${error.message}`)
     }
   }
 
+  const handleDeleteFlight = async (id: string) => {
+    const flight = flights.find(f => f.id === id)
+    
+    if (!confirm(`Are you sure you want to delete flight ${flight?.flightNumber}?\n\nThis action cannot be undone.`)) {
+      return
+    }
+
+    try {
+      const res = await fetch(`/api/flights/${id}`, { method: "DELETE" })
+      
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || "Failed to delete flight")
+      }
+
+      setFlights(flights.filter(f => f.id !== id))
+      alert("🗑️ Flight deleted successfully")
+      fetchData() // Refresh to update analytics
+    } catch (error: any) {
+      console.error("Error deleting flight:", error)
+      alert(`❌ Error: ${error.message}`)
+    }
+  }
+
+  // Booking CRUD Operations
   const handleUpdateBookingStatus = async (bookingId: string, newStatus: "pending" | "confirmed" | "cancelled") => {
     try {
       const res = await fetch(`/api/bookings?id=${bookingId}`, {
@@ -150,38 +211,51 @@ export function AdminPanel() {
         body: JSON.stringify({ status: newStatus })
       })
 
-      if (res.ok) {
-        // Update local state
-        setBookings(bookings.map(b => 
-          b.id === bookingId ? { ...b, status: newStatus } : b
-        ))
-        alert(`Booking status updated to ${newStatus}`)
-      } else {
-        throw new Error("Failed to update booking")
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || "Failed to update booking")
       }
-    } catch (error) {
+
+      // Update local state
+      setBookings(bookings.map(b => 
+        b.id === bookingId ? { ...b, status: newStatus } : b
+      ))
+      
+      const statusEmoji = {
+        confirmed: "✅",
+        pending: "⏳",
+        cancelled: "❌"
+      }
+      
+      alert(`${statusEmoji[newStatus]} Booking status updated to ${newStatus}`)
+      fetchData() // Refresh analytics
+    } catch (error: any) {
       console.error("Error updating booking:", error)
-      alert("Failed to update booking status")
+      alert(`❌ Error: ${error.message}`)
     }
   }
 
   const handleDeleteBooking = async (bookingId: string) => {
-    if (!confirm("Are you sure you want to delete this booking?")) return
+    const booking = bookings.find(b => b.id === bookingId)
+    
+    if (!confirm(`Are you sure you want to delete booking ${booking?.bookingRef}?\n\nThis will permanently remove the booking and cannot be undone.`)) {
+      return
+    }
 
     try {
       const res = await fetch(`/api/bookings?id=${bookingId}`, { method: "DELETE" })
       
-      if (res.ok) {
-        setBookings(bookings.filter(b => b.id !== bookingId))
-        alert("Booking deleted successfully")
-        // Refresh data to update analytics
-        fetchData()
-      } else {
-        throw new Error("Failed to delete booking")
+      if (!res.ok) {
+        const error = await res.json()
+        throw new Error(error.error || "Failed to delete booking")
       }
-    } catch (error) {
+
+      setBookings(bookings.filter(b => b.id !== bookingId))
+      alert("🗑️ Booking deleted successfully")
+      fetchData() // Refresh data to update analytics
+    } catch (error: any) {
       console.error("Error deleting booking:", error)
-      alert("Failed to delete booking")
+      alert(`❌ Error: ${error.message}`)
     }
   }
 
@@ -392,7 +466,7 @@ export function AdminPanel() {
                 />
               </div>
               <button
-                onClick={() => setShowAddFlight(true)}
+                onClick={handleAddFlight}
                 className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold rounded-lg transition-all shadow-lg hover:shadow-xl flex items-center gap-2 whitespace-nowrap"
               >
                 <Plus className="w-5 h-5" />
@@ -474,7 +548,7 @@ export function AdminPanel() {
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-2">
                                 <button
-                                  onClick={() => setSelectedFlight(flight)}
+                                  onClick={() => handleEditFlight(flight)}
                                   className="p-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 rounded-lg transition"
                                   title="Edit"
                                 >
@@ -671,6 +745,18 @@ export function AdminPanel() {
           </div>
         )}
       </div>
+
+      {/* Flight Dialog */}
+      <FlightDialog
+        isOpen={showFlightDialog}
+        onClose={() => {
+          setShowFlightDialog(false)
+          setSelectedFlight(null)
+        }}
+        onSubmit={handleSubmitFlight}
+        flight={selectedFlight}
+        mode={dialogMode}
+      />
     </div>
   )
 }

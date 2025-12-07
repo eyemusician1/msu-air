@@ -100,13 +100,18 @@ export async function addFlight(flight: Omit<Flight, "id" | "createdAt" | "updat
 /**
  * Update an existing flight
  */
-export async function updateFlight(flightId: string, updates: Partial<Flight>): Promise<void> {
+export async function updateFlight(flightId: string, updates: Partial<Flight>): Promise<Flight | null> {
   try {
     const flightDoc = doc(db, "flights", flightId)
     await updateDoc(flightDoc, {
       ...updates,
       updatedAt: new Date(),
     })
+    const snapshot = await getDoc(flightDoc)
+    if (!snapshot.exists()) {
+      return null
+    }
+    return { id: snapshot.id, ...snapshot.data() } as Flight
   } catch (error) {
     console.error("Error updating flight:", error)
     throw error
@@ -248,13 +253,18 @@ export async function createBooking(booking: Omit<Booking, "id" | "createdAt" | 
 /**
  * Update an existing booking
  */
-export async function updateBooking(bookingId: string, updates: Partial<Booking>): Promise<void> {
+export async function updateBooking(bookingId: string, updates: Partial<Booking>): Promise<Booking | null> {
   try {
     const bookingDoc = doc(db, "bookings", bookingId)
     await updateDoc(bookingDoc, {
       ...updates,
       updatedAt: new Date(),
     })
+    const snapshot = await getDoc(bookingDoc)
+    if (!snapshot.exists()) {
+      return null
+    }
+    return { id: snapshot.id, ...snapshot.data() } as Booking
   } catch (error) {
     console.error("Error updating booking:", error)
     throw error
@@ -376,6 +386,38 @@ export async function getAllUsers(): Promise<User[]> {
     })) as User[]
   } catch (error) {
     console.error("Error fetching all users:", error)
+    throw error
+  }
+}
+
+/**
+ * Get analytics data for admin dashboard
+ */
+export async function getAnalytics() {
+  try {
+    // Get all flights
+    const flights = await getFlights()
+    const totalFlights = flights.length
+    
+    // Get all bookings
+    const allBookings = await getAllBookings()
+    
+    let totalPassengers = 0
+    let totalRevenue = 0
+    
+    allBookings.forEach(booking => {
+      totalPassengers += booking.passengers?.length || 0
+      totalRevenue += booking.totalPrice || 0
+    })
+    
+    return {
+      totalFlights,
+      totalBookings: allBookings.length,
+      totalPassengers,
+      totalRevenue
+    }
+  } catch (error) {
+    console.error("Error getting analytics:", error)
     throw error
   }
 }

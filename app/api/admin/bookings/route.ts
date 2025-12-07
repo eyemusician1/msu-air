@@ -1,62 +1,43 @@
 import { getAllBookings, getFlightById } from "@/lib/firestore"
-import { NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server"
 
 export const dynamic = "force-dynamic"
 
-export async function GET() {
+/**
+ * GET - Fetch all bookings with flight data (Admin only)
+ */
+export async function GET(request: NextRequest) {
   try {
-    console.log("[Admin Bookings] Fetching all bookings...")
-    
     const bookings = await getAllBookings()
-    console.log(`[Admin Bookings] Found ${bookings.length} bookings`)
-
-    // If no bookings, return empty array
-    if (!bookings || bookings.length === 0) {
-      console.log("[Admin Bookings] No bookings found, returning empty array")
-      return NextResponse.json([])
-    }
-
-    // Enrich bookings with flight information
-    console.log("[Admin Bookings] Enriching bookings with flight data...")
+    
+    // Enrich bookings with flight data
     const enrichedBookings = await Promise.all(
       bookings.map(async (booking) => {
-        try {
-          if (!booking.flightId) {
-            console.warn("[Admin Bookings] Booking has no flightId:", booking.id)
-            return booking
-          }
-
+        if (booking.flightId) {
           const flight = await getFlightById(booking.flightId)
-          return {
-            ...booking,
-            flight: flight
-              ? {
-                  flightNumber: flight.flightNumber,
-                  airline: flight.airline,
-                  from: flight.from,
-                  to: flight.to,
-                  date: flight.date,
-                  departure: flight.departure,
-                  arrival: flight.arrival,
-                }
-              : null,
+          if (flight) {
+            return {
+              ...booking,
+              flight: {
+                flightNumber: flight.flightNumber,
+                from: flight.from,
+                to: flight.to,
+                date: flight.date,
+                departure: flight.departure,
+                arrival: flight.arrival
+              }
+            }
           }
-        } catch (err) {
-          console.error("[Admin Bookings] Error enriching booking:", booking.id, err)
-          return booking
         }
+        return booking
       })
     )
-
-    console.log(`[Admin Bookings] Successfully enriched ${enrichedBookings.length} bookings`)
+    
     return NextResponse.json(enrichedBookings)
   } catch (error) {
     console.error("[Admin Bookings] Error:", error)
     return NextResponse.json(
-      { 
-        error: "Failed to fetch bookings", 
-        details: error instanceof Error ? error.message : String(error) 
-      }, 
+      { error: "Failed to fetch bookings" },
       { status: 500 }
     )
   }
