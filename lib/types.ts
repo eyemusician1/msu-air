@@ -45,9 +45,10 @@ export interface User {
   displayName: string
   phone?: string
   passport?: string
-  dateOfBirth?: string  // ADD THIS
-  gender?: "male" | "female" | "other" | "prefer-not-to-say"  // ADD THIS
+  dateOfBirth?: string  
+  gender?: "male" | "female" | "other" | "prefer-not-to-say" 
   role?: "user" | "admin"
+  photoURL?: string
   createdAt: Date
   updatedAt: Date
 }

@@ -43,22 +43,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (firebaseUser) {
         // Fetch user profile from Firestore
         try {
+          console.log("🔍 Fetching user profile for:", firebaseUser.uid)
+          
+          // Add a longer delay to ensure auth token has propagated
+          await new Promise(resolve => setTimeout(resolve, 1000))
+          
           const profile = await getUserById(firebaseUser.uid)
+          
           if (profile) {
+            console.log("✅ User profile found")
             setUserProfile(profile)
           } else {
-            // Create user profile if it doesn't exist
+            console.log("⚠️ User profile not found, creating new one...")
+            
             const newProfile: Omit<User, "id" | "createdAt" | "updatedAt"> = {
               email: firebaseUser.email || "",
               displayName: firebaseUser.displayName || "",
+              photoURL: firebaseUser.photoURL || "",
               role: "user",
             }
-            await createUser(firebaseUser.uid, newProfile)
-            const createdProfile = await getUserById(firebaseUser.uid)
-            setUserProfile(createdProfile)
+            
+            // Try multiple times with increasing delays
+            let attempts = 0
+            const maxAttempts = 3
+            
+            while (attempts < maxAttempts) {
+              try {
+                await createUser(firebaseUser.uid, newProfile)
+                console.log("✅ User profile created successfully")
+                
+                const createdProfile = await getUserById(firebaseUser.uid)
+                setUserProfile(createdProfile)
+                break // Success, exit loop
+                
+              } catch (createError: any) {
+                attempts++
+                console.error(`❌ Attempt ${attempts} failed:`, createError.code)
+                
+                if (attempts < maxAttempts) {
+                  // Wait before retrying (exponential backoff)
+                  const delay = 1000 * attempts
+                  console.log(`⏳ Retrying in ${delay}ms...`)
+                  await new Promise(resolve => setTimeout(resolve, delay))
+                } else {
+                  console.error("❌ Max attempts reached. Profile creation failed.")
+                  // Don't throw - let user continue, they can try again later
+                }
+              }
+            }
           }
-        } catch (error) {
-          console.error("Error fetching user profile:", error)
+        } catch (error: any) {
+          console.error("❌ Error in onAuthStateChanged:", error.code, error.message)
         }
       } else {
         setUserProfile(null)
@@ -86,14 +121,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await updateProfile(userCredential.user, { displayName: name })
       console.log("✅ Profile updated")
 
-      console.log("📝 Creating Firestore document with data:", {
-        email,
-        displayName: name,
-        dateOfBirth,
-        gender,
-        role: "user",
-      })
+      // Wait for auth to propagate
+      await new Promise(resolve => setTimeout(resolve, 1000))
 
+      console.log("📝 Creating Firestore document...")
+      
       await createUser(userCredential.user.uid, {
         email,
         displayName: name,
@@ -101,12 +133,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         gender: gender as "male" | "female" | "other" | "prefer-not-to-say" | undefined,
         role: "user",
       })
-
+      
       console.log("✅ Firestore document created successfully!")
     } catch (error: any) {
-      console.error("❌ Sign up error:", error)
-      console.error("Error code:", error.code)
-      console.error("Error message:", error.message)
+      console.error("❌ Sign up error:", error.code, error.message)
       throw error
     }
   }
@@ -124,54 +154,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       console.log("🚪 Logging out...")
-      
-      // Sign out from Firebase
       await signOut(auth)
-      
       console.log("✅ Signed out successfully")
       
-      // Clear local state
       setUser(null)
       setUserProfile(null)
       
-      // Redirect to login page after a small delay
       setTimeout(() => {
         window.location.href = "/login"
       }, 100)
-      
     } catch (error) {
       console.error("❌ Logout error:", error)
-      // Even if there's an error, try to redirect
       window.location.href = "/login"
     }
   }
 
   const loginWithGoogle = async () => {
     try {
+      console.log("🔵 Starting Google sign-in...")
+      
       const provider = new GoogleAuthProvider()
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      })
+      
       const result = await signInWithPopup(auth, provider)
+      console.log("✅ Google authentication successful:", result.user.email)
 
-      if (result.user) {
-        // Google emails are always valid, but we can still check
-        const emailValidation = validateEmail(result.user.email || "")
-        if (!emailValidation.isValid) {
-          await signOut(auth) // Sign out if email is not valid
-          throw new Error(emailValidation.error || "Invalid email address")
-        }
-
-        // Check if user document exists, create if not
-        const existingProfile = await getUserById(result.user.uid)
-        
-        if (!existingProfile) {
-          await createUser(result.user.uid, {
-            email: result.user.email || "",
-            displayName: result.user.displayName || "",
-            role: "user",
-          })
-        }
-      }
+      // Don't do anything here - let onAuthStateChanged handle it
+      // Just wait a bit for the state change to trigger
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      
+      console.log("✅ Google sign-in flow complete")
+      
     } catch (error: any) {
-      console.error("Google login error:", error)
+      console.error("❌ Google login error:", error.code, error.message)
+      
+      // Provide better error messages
+      if (error.code === 'auth/popup-closed-by-user') {
+        throw new Error("Sign-in cancelled. Please try again.")
+      } else if (error.code === 'auth/popup-blocked') {
+        throw new Error("Pop-up was blocked. Please allow pop-ups for this site.")
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        throw new Error("Another sign-in popup is open. Please close it first.")
+      }
+      
       throw error
     }
   }
