@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { X, Plane, MapPin, Calendar, Clock, DollarSign, Users } from "lucide-react"
+import { X, Plane, MapPin, Calendar, Clock, DollarSign, Users, PhilippinePeso } from "lucide-react"
 
 // Import your Flight type from your types file
 import type { Flight } from "@/lib/types"
@@ -322,7 +322,7 @@ export function FlightDialog({ isOpen, onClose, onSubmit, flight, mode }: Flight
           {/* Pricing & Capacity */}
           <div>
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-emerald-400" />
+              <PhilippinePeso className="w-5 h-5 text-emerald-400" />
               Pricing & Capacity
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
