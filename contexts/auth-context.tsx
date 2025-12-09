@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+
 import {
   type User as FirebaseUser,
   createUserWithEmailAndPassword,
@@ -11,9 +12,11 @@ import {
   signInWithPopup,
   updateProfile,
 } from "firebase/auth"
+
 import { auth } from "@/lib/firebase"
 import { createUser, getUserById } from "@/lib/firestore"
 import type { User } from "@/lib/types"
+import { validateEmail } from "@/lib/email-validator"
 
 interface AuthContextType {
   user: FirebaseUser | null
@@ -71,6 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log("🚀 Starting sign up process...")
       
+      // Validate email domain before proceeding
+      const emailValidation = validateEmail(email)
+      if (!emailValidation.isValid) {
+        throw new Error(emailValidation.error || "Invalid email address")
+      }
+      
       const userCredential = await createUserWithEmailAndPassword(auth, email, password)
       console.log("✅ Auth user created:", userCredential.user.uid)
 
@@ -103,6 +112,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const login = async (email: string, password: string) => {
+    // Validate email domain
+    const emailValidation = validateEmail(email)
+    if (!emailValidation.isValid) {
+      throw new Error(emailValidation.error || "Invalid email address")
+    }
+    
     await signInWithEmailAndPassword(auth, email, password)
   }
 
@@ -137,6 +152,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await signInWithPopup(auth, provider)
 
       if (result.user) {
+        // Google emails are always valid, but we can still check
+        const emailValidation = validateEmail(result.user.email || "")
+        if (!emailValidation.isValid) {
+          await signOut(auth) // Sign out if email is not valid
+          throw new Error(emailValidation.error || "Invalid email address")
+        }
+
         // Check if user document exists, create if not
         const existingProfile = await getUserById(result.user.uid)
         

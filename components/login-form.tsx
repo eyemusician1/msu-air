@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import gsap from "gsap"
+import { validateEmail } from "@/lib/email-validator"
 
 export function LoginForm() {
   const [isLogin, setIsLogin] = useState(true)
@@ -23,7 +24,8 @@ export function LoginForm() {
     rememberMe: false,
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [authError, setAuthError] = useState("")
+  const [authError, setAuthError] = useState<string>("")
+
   const { signUp, login, loginWithGoogle } = useAuth()
   const router = useRouter()
 
@@ -43,17 +45,8 @@ export function LoginForm() {
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({ defaults: { ease: "power3.out" } })
 
-      gsap.set([logoRef.current, formRef.current, footerRef.current], {
-        opacity: 0,
-        y: 30,
-      })
-
-      gsap.from(imageRef.current, {
-        opacity: 0,
-        x: 100,
-        duration: 1,
-        ease: "power3.out",
-      })
+      gsap.set([logoRef.current, formRef.current, footerRef.current], { opacity: 0, y: 30 })
+      gsap.from(imageRef.current, { opacity: 0, x: 100, duration: 1, ease: "power3.out" })
 
       tl.to(logoRef.current, { opacity: 1, y: 0, duration: 0.6 })
 
@@ -74,8 +67,11 @@ export function LoginForm() {
         ease: "power2.out",
       })
 
-      tl.to(formRef.current, { opacity: 1, y: 0, duration: 0.6 }, "-=0.3")
-        .to(footerRef.current, { opacity: 1, y: 0, duration: 0.4 }, "-=0.2")
+      tl.to(formRef.current, { opacity: 1, y: 0, duration: 0.6 }, "-=0.3").to(
+        footerRef.current,
+        { opacity: 1, y: 0, duration: 0.4 },
+        "-=0.2",
+      )
 
       gsap.from(inputRefs.current.filter(Boolean), {
         opacity: 0,
@@ -109,11 +105,7 @@ export function LoginForm() {
       },
     })
 
-    tl.to(formRef.current, {
-      opacity: 0,
-      scale: 0.95,
-      duration: 0.25,
-    }).to(formRef.current, {
+    tl.to(formRef.current, { opacity: 0, scale: 0.95, duration: 0.25 }).to(formRef.current, {
       opacity: 1,
       scale: 1,
       duration: 0.3,
@@ -166,13 +158,27 @@ export function LoginForm() {
     })
   }
 
+  const handleEmailBlur = () => {
+    if (formData.email) {
+      const emailValidation = validateEmail(formData.email)
+      if (!emailValidation.isValid) {
+        setErrors({ ...errors, email: emailValidation.error || "Invalid email" })
+      } else {
+        // Clear error if valid
+        const newErrors = { ...errors }
+        delete newErrors.email
+        setErrors(newErrors)
+      }
+    }
+  }
+
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {}
 
-    if (!formData.email) {
-      newErrors.email = "Email is required"
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email"
+    // Email validation with domain checking
+    const emailValidation = validateEmail(formData.email)
+    if (!emailValidation.isValid) {
+      newErrors.email = emailValidation.error || "Invalid email"
     }
 
     if (!formData.password) {
@@ -205,7 +211,7 @@ export function LoginForm() {
     return Object.keys(newErrors).length === 0
   }
 
-  const getFirebaseErrorMessage = (error: any) => {
+  const getFirebaseErrorMessage = (error: any): string => {
     switch (error.code) {
       case "auth/email-already-in-use":
         return "This email is already registered"
@@ -249,14 +255,7 @@ export function LoginForm() {
       if (isLogin) {
         await login(formData.email, formData.password)
       } else {
-        // Pass dateOfBirth and gender to signUp
-        await signUp(
-          formData.email,
-          formData.password,
-          formData.name,
-          formData.dateOfBirth,
-          formData.gender
-        )
+        await signUp(formData.email, formData.password, formData.name, formData.dateOfBirth, formData.gender)
       }
 
       animateSuccess()
@@ -336,7 +335,11 @@ export function LoginForm() {
           </div>
 
           {/* Form Card */}
-          <form ref={formRef} onSubmit={handleSubmit} className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6 sm:p-8">
+          <form
+            ref={formRef}
+            onSubmit={handleSubmit}
+            className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6 sm:p-8"
+          >
             {/* Auth Error Alert */}
             {authError && (
               <div className="mb-5 p-4 bg-red-500/10 border border-red-500/30 rounded-xl flex items-start gap-3">
@@ -379,15 +382,22 @@ export function LoginForm() {
                   value={formData.email}
                   onChange={handleInputChange}
                   onFocus={() => handleInputFocus(1)}
-                  onBlur={() => handleInputBlur(1)}
+                  onBlur={() => {
+                    handleInputBlur(1)
+                    handleEmailBlur()
+                  }}
                   placeholder="your@email.com"
                   className="w-full pl-12 pr-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
                 />
               </div>
-              {errors.email && (
+              {errors.email ? (
                 <p className="mt-1 text-xs text-red-400 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" />
                   {errors.email}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-slate-500">
+                 
                 </p>
               )}
             </div>
@@ -406,7 +416,7 @@ export function LoginForm() {
                     onFocus={() => handleInputFocus(2)}
                     onBlur={() => handleInputBlur(2)}
                     max={new Date().toISOString().split("T")[0]}
-                    className="w-full pl-12 pr-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200 [color-scheme:dark]"
+                    className="w-full pl-12 pr-4 py-3 bg-slate-700/50 border border-slate-600 rounded-xl text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200 color-scheme:dark"
                   />
                 </div>
                 {errors.dateOfBirth && (
@@ -545,7 +555,9 @@ export function LoginForm() {
                   </svg>
                   Processing...
                 </span>
-              ) : isLogin ? "Sign In" : "Create Account"}
+              ) : (
+                isLogin ? "Sign In" : "Create Account"
+              )}
             </button>
 
             {/* Divider */}
@@ -594,13 +606,7 @@ export function LoginForm() {
 
       {/* Right Side - Image Panel */}
       <div ref={imageRef} className="hidden lg:block lg:w-1/2 relative">
-        <Image
-          src="/airport1.jpg"
-          alt="Travel"
-          fill
-          className="object-cover"
-          priority
-        />
+        <Image src="/airport1.jpg" alt="Travel" fill className="object-cover" priority />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/50 to-transparent" />
         <div className="absolute bottom-0 left-0 right-0 p-12">
           <h2 className="text-4xl font-bold text-white mb-4">Your Journey Starts Here</h2>
